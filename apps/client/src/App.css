@@ -44,9 +44,34 @@
 
 .hero-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(100px, 1fr));
+  grid-template-columns: repeat(4, minmax(100px, 1fr));
   gap: 12px;
   min-width: min(100%, 360px);
+}
+
+.progress-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.progress-strip div {
+  padding: 14px 16px;
+  border: 1px solid rgba(234, 197, 133, 0.18);
+  border-radius: 18px;
+  background: rgba(35, 23, 17, 0.88);
+}
+
+.progress-strip span {
+  color: #b59d7f;
+  font-size: 13px;
+}
+
+.progress-strip strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 20px;
 }
 
 .hero-stats div,
@@ -279,10 +304,22 @@
   margin: 16px 0;
 }
 
+.level-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
 .battle-button {
   background: linear-gradient(135deg, #b86f23, #e29c45);
   color: #20130b;
   font-weight: 800;
+}
+
+.spell-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .result-summary {
@@ -318,6 +355,7 @@
   }
 
   .hero-banner,
+  .progress-strip,
   .layout-grid {
     grid-template-columns: 1fr;
   }

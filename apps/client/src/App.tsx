@@ -37,9 +37,17 @@ const initialSave: SaveGame = {
     priest: 1,
     mage: 0,
     knight: 0,
+    wolf_rider: 0,
+    shaman: 0,
+    archangel: 0,
+    iron_wheel: 0,
+    troll_cyborg: 0,
   },
+  playerLevel: 1,
+  xp: 0,
   activeLevelId: 'tutorial-1',
   activeSpellId: 'fire_blast',
+  completedLevelIds: [],
   formation: [
     { unitId: 'behemoth', row: 2, col: 1, level: 1 },
     { unitId: 'footman', row: 1, col: 3, level: 1 },
@@ -50,6 +58,29 @@ const initialSave: SaveGame = {
   ],
 }
 
+const defaultRoster = initialSave.roster
+
+const normalizeSave = (save: Partial<SaveGame> | null | undefined): SaveGame => ({
+  wallets: {
+    ...initialSave.wallets,
+    ...save?.wallets,
+  },
+  buildings: {
+    ...initialSave.buildings,
+    ...save?.buildings,
+  },
+  roster: {
+    ...defaultRoster,
+    ...save?.roster,
+  },
+  playerLevel: save?.playerLevel ?? 1,
+  xp: save?.xp ?? 0,
+  activeLevelId: save?.activeLevelId ?? initialSave.activeLevelId,
+  activeSpellId: save?.activeSpellId ?? initialSave.activeSpellId,
+  completedLevelIds: save?.completedLevelIds ?? [],
+  formation: save?.formation ?? initialSave.formation,
+})
+
 const getStoredSave = (): SaveGame => {
   const raw = localStorage.getItem(saveKey)
 
@@ -58,11 +89,13 @@ const getStoredSave = (): SaveGame => {
   }
 
   try {
-    return JSON.parse(raw) as SaveGame
+    return normalizeSave(JSON.parse(raw) as Partial<SaveGame>)
   } catch {
     return initialSave
   }
 }
+
+const xpToNextLevel = (level: number) => 120 + (level - 1) * 40
 
 const countPlacedUnits = (formation: FormationPlacement[]) => {
   const counts: Record<string, number> = {}
@@ -111,12 +144,17 @@ function App() {
     () => gameContent.tutorialLevels.find((level) => level.id === save.activeLevelId) ?? gameContent.tutorialLevels[0],
     [save.activeLevelId],
   )
+  const activeLevelIndex = useMemo(
+    () => gameContent.tutorialLevels.findIndex((level) => level.id === tutorialLevel.id),
+    [tutorialLevel.id],
+  )
 
   const attackerArmy = useMemo(() => ({ placements: save.formation }), [save.formation])
   const placementCounts = useMemo(() => countPlacedUnits(save.formation), [save.formation])
   const usedPopulation = useMemo(() => getArmyPopulation(attackerArmy), [attackerArmy])
   const populationCap = getPopulationCap()
   const attackerValidation = validateArmy(attackerArmy, 'A')
+  const nextLevelXp = xpToNextLevel(save.playerLevel)
 
   const recruitUnit = (unit: UnitTemplate) => {
     if (!unit.recruitment) {
@@ -238,6 +276,46 @@ function App() {
     })
 
     setBattleResult(result)
+
+    if (result.winner !== 'A') {
+      return
+    }
+
+    setSave((current) => {
+      const nextCompletedLevelIds = current.completedLevelIds.includes(tutorialLevel.id)
+        ? current.completedLevelIds
+        : [...current.completedLevelIds, tutorialLevel.id]
+      let nextXp = current.xp + 50 + activeLevelIndex * 25
+      let nextPlayerLevel = current.playerLevel
+      let nextRoster = current.roster
+
+      while (nextXp >= xpToNextLevel(nextPlayerLevel)) {
+        nextXp -= xpToNextLevel(nextPlayerLevel)
+        nextPlayerLevel += 1
+      }
+
+      const nextTutorialLevel = gameContent.tutorialLevels[activeLevelIndex + 1]
+      if (tutorialLevel.id === 'tutorial-4') {
+        nextRoster = {
+          ...nextRoster,
+          succubus: Math.max(nextRoster.succubus ?? 0, 1),
+          berserker: Math.max(nextRoster.berserker ?? 0, 1),
+        }
+      }
+
+      return {
+        ...current,
+        wallets: {
+          gold: current.wallets.gold + tutorialLevel.rewards.gold,
+          crystal: current.wallets.crystal + tutorialLevel.rewards.crystal,
+        },
+        roster: nextRoster,
+        playerLevel: nextPlayerLevel,
+        xp: nextXp,
+        completedLevelIds: nextCompletedLevelIds,
+        activeLevelId: nextTutorialLevel && !current.completedLevelIds.includes(tutorialLevel.id) ? nextTutorialLevel.id : current.activeLevelId,
+      }
+    })
   }
 
   return (
@@ -247,7 +325,7 @@ function App() {
           <p className="eyebrow">Little Empire MVP / 单机浏览器版</p>
           <h1>小小帝国：城市经营 + 阵型战斗首轮实现</h1>
           <p className="hero-copy">
-            这一版先打通数据驱动内容、离线资源收取、6x15 布阵和确定性战斗回放，后续再继续补任务、升级、更多兵种与法术。
+            这一版继续扩到多关教学与成长反馈，首轮单机循环已经可以从收菜、招募、布阵一路推进到关卡奖励和解锁下一关。
           </p>
         </div>
         <div className="hero-stats">
@@ -265,6 +343,31 @@ function App() {
               {usedPopulation}/{populationCap}
             </strong>
           </div>
+          <div>
+            <span>等级 / 经验</span>
+            <strong>
+              {save.playerLevel} / {save.xp}
+            </strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="progress-strip">
+        <div>
+          <span>教学进度</span>
+          <strong>
+            {save.completedLevelIds.length}/{gameContent.tutorialLevels.length}
+          </strong>
+        </div>
+        <div>
+          <span>下一级所需经验</span>
+          <strong>{nextLevelXp}</strong>
+        </div>
+        <div>
+          <span>当前关卡奖励</span>
+          <strong>
+            {tutorialLevel.rewards.gold}G / {tutorialLevel.rewards.crystal}C
+          </strong>
         </div>
       </section>
 
@@ -300,7 +403,7 @@ function App() {
         <article className="panel">
           <div className="panel-header">
             <h2>招募与军队库存</h2>
-            <p>先用已恢复兵种搭出可玩的起始阵容，后续再扩成完整 12 兵种。</p>
+            <p>12 个基础兵种已接入基础数值；特殊弹射、群攻和增益效果下一轮再细化。</p>
           </div>
           <div className="roster-grid">
             {gameContent.units.map((unit) => (
@@ -375,9 +478,30 @@ function App() {
             <h2>PvE 关卡</h2>
             <p>{tutorialLevel.description}</p>
           </div>
+          <div className="level-selector">
+            {gameContent.tutorialLevels.map((level, index) => {
+              const unlocked = index === 0 || save.completedLevelIds.includes(gameContent.tutorialLevels[index - 1].id)
+              const completed = save.completedLevelIds.includes(level.id)
+
+              return (
+                <button
+                  key={level.id}
+                  type="button"
+                  className={save.activeLevelId === level.id ? 'spell-button selected' : 'spell-button'}
+                  disabled={!unlocked}
+                  onClick={() => setSave((current) => ({ ...current, activeLevelId: level.id }))}
+                >
+                  <span>{level.name}</span>
+                  <small>{completed ? '已通关' : unlocked ? '已解锁' : '未解锁'}</small>
+                </button>
+              )
+            })}
+          </div>
           <div className="level-card">
             <strong>{tutorialLevel.name}</strong>
-            <span>敌方阵容已固定，可用于验证同种子重放。</span>
+            <span>
+              敌方阵容固定，可用于验证同种子重放。奖励 {tutorialLevel.rewards.gold}G / {tutorialLevel.rewards.crystal}C。
+            </span>
           </div>
           <div className="spell-picker">
             {gameContent.spells.map((spell) => (
@@ -417,6 +541,12 @@ function App() {
                   <span>伤亡</span>
                   <strong>
                     {battleResult.summary.attackerLosses}/{battleResult.summary.defenderLosses}
+                  </strong>
+                </div>
+                <div>
+                  <span>奖励</span>
+                  <strong>
+                    {battleResult.winner === 'A' ? `${tutorialLevel.rewards.gold}G / ${tutorialLevel.rewards.crystal}C` : '0'}
                   </strong>
                 </div>
               </div>

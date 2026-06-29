@@ -108,6 +108,7 @@ export interface TutorialLevel {
   name: string
   description: string
   defender: ArmySnapshot
+  rewards: Record<ResourceId, number>
 }
 
 export interface GameContent {
@@ -131,7 +132,10 @@ export interface SaveGame {
   wallets: Record<ResourceId, number>
   buildings: Record<string, BuildingSaveState>
   roster: Record<string, number>
+  playerLevel: number
+  xp: number
   activeLevelId: string
   activeSpellId: string
+  completedLevelIds: string[]
   formation: FormationPlacement[]
 }

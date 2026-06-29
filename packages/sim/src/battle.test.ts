@@ -36,4 +36,28 @@ describe('battle simulation', () => {
 
     expect(result.ok).toBe(false)
   })
+
+  it('keeps minimum damage above zero against heavy armor', () => {
+    const result = simulateBattle({
+      seed: 7,
+      maxTicks: 40,
+      attacker: {
+        placements: [
+          { unitId: 'behemoth', row: 2, col: 0, level: 1 },
+          { unitId: 'archer', row: 1, col: 4, level: 1 },
+        ],
+      },
+      defender: {
+        placements: [
+          { unitId: 'berserker', row: 2, col: 12, level: 1 },
+          { unitId: 'knight', row: 1, col: 10, level: 1 },
+        ],
+      },
+    })
+
+    const damageEvent = result.events.find((event) => event.type === 'attack' && event.value !== undefined)
+
+    expect(damageEvent).toBeDefined()
+    expect(damageEvent?.value).toBeGreaterThanOrEqual(1)
+  })
 })
