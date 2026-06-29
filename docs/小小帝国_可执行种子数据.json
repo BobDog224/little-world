@@ -1,0 +1,1873 @@
+{
+  "meta": {
+    "project_id": "little-empire-cleanroom",
+    "content_version": "0.9.0",
+    "generated_at": "2026-06-30",
+    "provenance": "publicly_recoverable_sources",
+    "disclaimer": "Not an original server dump. Unknown and conflicting values remain explicitly marked.",
+    "original_package_name": "com.camelgames.fantasyland",
+    "last_archived_android_version": "1.26.4",
+    "original_service_closed_at_utc": "2023-05-08T11:00:00Z"
+  },
+  "rules": {
+    "battlefield": {
+      "rows": 6,
+      "columns": 15,
+      "side_a_deploy_columns": [
+        0,
+        6
+      ],
+      "neutral_column": 7,
+      "side_b_deploy_columns": [
+        8,
+        14
+      ],
+      "source": [
+        "C1"
+      ],
+      "status": "community_verified"
+    },
+    "damage": {
+      "extra": "floor((attack - armor) * 2.0)",
+      "normal": "floor(attack - armor)",
+      "reduced": "floor((attack - armor) * 0.75)",
+      "hero_attack": "floor((heroAttack - armor) * 1.2)",
+      "against_hero_armor": "floor((attack - heroArmor) * 0.5)",
+      "minimum_damage": 1,
+      "minimum_damage_status": "implementation_assumption"
+    },
+    "counter_matrix": {
+      "normal": {
+        "strong_vs": [
+          "light"
+        ],
+        "weak_vs": [
+          "heavy"
+        ]
+      },
+      "piercing": {
+        "strong_vs": [
+          "cloth"
+        ],
+        "weak_vs": [
+          "light"
+        ]
+      },
+      "magic": {
+        "strong_vs": [
+          "heavy"
+        ],
+        "weak_vs": [
+          "cloth"
+        ]
+      },
+      "hero": {
+        "strong_vs": [
+          "light",
+          "cloth",
+          "heavy"
+        ],
+        "weak_vs": []
+      }
+    },
+    "simulation": {
+      "fixed_tick_ms": 100,
+      "rng": "seeded_xorshift_or_pcg",
+      "authoritative_state": "server_for_online_mode",
+      "status": "implementation_decision"
+    }
+  },
+  "resources": [
+    {
+      "id": "gold",
+      "name_zh": "金币",
+      "category": "基础货币",
+      "usage": "建筑、招募、升级、联盟等绝大多数功能",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "crystal",
+      "name_zh": "水晶",
+      "category": "基础货币",
+      "usage": "建筑、招募、升级，与金币共同构成基础经济",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "mojo",
+      "name_zh": "Mojo",
+      "category": "高级/稀有货币",
+      "usage": "法术、便捷功能、随机系统与部分高级消耗",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "magic_spar",
+      "name_zh": "Magic Spar",
+      "category": "高级成长材料",
+      "usage": "法术、勋章、英雄能力、符文、科技",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "dark_crystal",
+      "name_zh": "暗水晶",
+      "category": "中后期材料",
+      "usage": "高级系统与活动消耗",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "element",
+      "name_zh": "元素",
+      "category": "法术分解材料",
+      "usage": "法术升级与相关系统",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "iron_ingot",
+      "name_zh": "铁锭",
+      "category": "进化材料",
+      "usage": "兵种、装备、勋章等",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "brass_ingot",
+      "name_zh": "黄铜/铜锭",
+      "category": "进化材料",
+      "usage": "兵种、装备、勋章等",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "gold_ingot",
+      "name_zh": "金锭",
+      "category": "进化材料",
+      "usage": "兵种、装备、勋章等",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "mithril_ingot",
+      "name_zh": "秘银锭",
+      "category": "高级进化材料",
+      "usage": "高级兵种、装备、勋章",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "demonite_ingot",
+      "name_zh": "魔晶锭",
+      "category": "高级进化材料",
+      "usage": "高级兵种、装备、勋章",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "rune_fragment",
+      "name_zh": "符文碎片",
+      "category": "符文材料",
+      "usage": "符文解锁、重铸",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "alliance_coin",
+      "name_zh": "联盟币",
+      "category": "联盟材料",
+      "usage": "联盟建筑与联盟成长",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "sea_stone",
+      "name_zh": "海石",
+      "category": "后期材料",
+      "usage": "高阶装备进化",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "order_key",
+      "name_zh": "秩序之钥",
+      "category": "后期材料",
+      "usage": "高阶装备/宝箱相关",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "pet_food_basic",
+      "name_zh": "基础宠物食物",
+      "category": "宠物材料",
+      "usage": "宠物经验",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "pet_food_advanced",
+      "name_zh": "高级宠物食物",
+      "category": "宠物材料",
+      "usage": "更多宠物经验",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "pet_food_deluxe",
+      "name_zh": "豪华宠物食物",
+      "category": "宠物材料",
+      "usage": "大量宠物经验",
+      "source": [
+        "W4",
+        "W5"
+      ],
+      "status": "community_verified"
+    }
+  ],
+  "heroes": [
+    {
+      "id": "behemoth",
+      "name_zh": "巨兽",
+      "name_en": "Behemoth",
+      "role": "前排坦克/控制",
+      "hp": 580,
+      "attack": 12,
+      "armor": 3,
+      "range": 1,
+      "footprint": [
+        2,
+        2
+      ],
+      "passive_or_skill": "Fury Slash：攻击时概率触发，对前方目标造成伤害并眩晕；动画期间存在短暂规避/无敌描述。",
+      "medal": "Earth Medal：每级约 +60 HP、+2% 抵抗（个别页面曾出现 1.2% 的冲突值，需配置化）。",
+      "source": [
+        "W1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "succubus",
+      "name_zh": "魅魔",
+      "name_en": "Succubus",
+      "role": "后排远程爆发",
+      "hp": 260,
+      "attack": 9,
+      "armor": 1,
+      "range": 7,
+      "footprint": [
+        2,
+        2
+      ],
+      "passive_or_skill": "Magic Flash：随机触发约 4 秒暴击强化。",
+      "medal": "Mist Medal：每级约 -3% 法术冷却、+1% 眩晕相关增益。",
+      "source": [
+        "W1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "berserker",
+      "name_zh": "狂战士",
+      "name_en": "Berserker",
+      "role": "中前排全能输出",
+      "hp": 480,
+      "attack": 14,
+      "armor": 2,
+      "range": 2,
+      "footprint": [
+        2,
+        2
+      ],
+      "passive_or_skill": "Battle Heart：生命低于约 30% 时触发一次，短暂无敌后提升移动速度与攻击。",
+      "medal": "Lightning Medal：每级约 +1 攻击、+1% 闪避。",
+      "source": [
+        "W1"
+      ],
+      "status": "community_verified"
+    }
+  ],
+  "units": [
+    {
+      "id": "footman",
+      "name_zh": "步兵",
+      "name_en": "Footman",
+      "hp_l1": 290,
+      "hp_l6": 435,
+      "attack_l1": 14,
+      "attack_l6": 22,
+      "attack_type": "normal",
+      "armor": 3,
+      "armor_type": "light",
+      "range": 1,
+      "footprint": [
+        1,
+        1
+      ],
+      "population": 1,
+      "cost_gold": 80,
+      "cost_crystal": 0,
+      "facility": "Barracks",
+      "trait": "基础近战",
+      "source": [
+        "W2"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "troll",
+      "name_zh": "巨魔",
+      "name_en": "Troll",
+      "hp_l1": 220,
+      "hp_l6": 330,
+      "attack_l1": 16,
+      "attack_l6": 24,
+      "attack_type": "piercing",
+      "armor": 1,
+      "armor_type": "cloth",
+      "range": 2,
+      "footprint": [
+        1,
+        1
+      ],
+      "population": 1,
+      "cost_gold": 90,
+      "cost_crystal": 20,
+      "facility": "Barracks",
+      "trait": "短距离穿刺",
+      "source": [
+        "W2"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "archer",
+      "name_zh": "弓箭手",
+      "name_en": "Archer",
+      "hp_l1": 190,
+      "hp_l6": 285,
+      "attack_l1": 10,
+      "attack_l6": 20,
+      "attack_type": "piercing",
+      "armor": 1,
+      "armor_type": "cloth",
+      "range": 5,
+      "footprint": [
+        1,
+        1
+      ],
+      "population": 1,
+      "cost_gold": 200,
+      "cost_crystal": 50,
+      "facility": "Shooting Range",
+      "trait": "基础远程",
+      "source": [
+        "W2"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "ninja",
+      "name_zh": "忍者",
+      "name_en": "Ninja",
+      "hp_l1": 210,
+      "hp_l6": 315,
+      "attack_l1": 8,
+      "attack_l6": 16,
+      "attack_type": "normal",
+      "armor": 1,
+      "armor_type": "light",
+      "range": 4,
+      "footprint": [
+        1,
+        1
+      ],
+      "population": 1,
+      "cost_gold": 300,
+      "cost_crystal": 60,
+      "facility": "Shooting Range",
+      "trait": "一次可攻击最多 3 个目标",
+      "source": [
+        "W2"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "priest",
+      "name_zh": "牧师",
+      "name_en": "Priest",
+      "hp_l1": 180,
+      "hp_l6": 270,
+      "attack_l1": 15,
+      "attack_l6": 20,
+      "attack_type": "heal",
+      "armor": 1,
+      "armor_type": "cloth",
+      "range": 1,
+      "footprint": [
+        1,
+        1
+      ],
+      "population": 1,
+      "cost_gold": 100,
+      "cost_crystal": 150,
+      "facility": "Magic Library",
+      "trait": "治疗单位；表中数值为单次治疗",
+      "source": [
+        "W2"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "mage",
+      "name_zh": "法师",
+      "name_en": "Mage",
+      "hp_l1": 300,
+      "hp_l6": 450,
+      "attack_l1": 15,
+      "attack_l6": 23,
+      "attack_type": "magic",
+      "armor": 2,
+      "armor_type": "cloth",
+      "range": 4,
+      "footprint": [
+        1,
+        1
+      ],
+      "population": 2,
+      "cost_gold": 400,
+      "cost_crystal": 300,
+      "facility": "Magic Library",
+      "trait": "命中附带减速",
+      "source": [
+        "W2"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "knight",
+      "name_zh": "骑士",
+      "name_en": "Knight",
+      "hp_l1": 520,
+      "hp_l6": 750,
+      "attack_l1": 25,
+      "attack_l6": 34,
+      "attack_type": "normal",
+      "armor": 4,
+      "armor_type": "heavy",
+      "range": 1,
+      "footprint": [
+        2,
+        1
+      ],
+      "population": 3,
+      "cost_gold": 700,
+      "cost_crystal": 120,
+      "facility": "Stable",
+      "trait": "重甲近战",
+      "source": [
+        "W2"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "wolf_rider",
+      "name_zh": "狼骑兵",
+      "name_en": "Wolf Rider",
+      "hp_l1": 420,
+      "hp_l6": 630,
+      "attack_l1": 21,
+      "attack_l6": 29,
+      "attack_type": "normal",
+      "armor": 1,
+      "armor_type": "cloth",
+      "range": 5,
+      "footprint": [
+        2,
+        1
+      ],
+      "population": 3,
+      "cost_gold": 500,
+      "cost_crystal": 300,
+      "facility": "Stable",
+      "trait": "大体型远程骑兵",
+      "source": [
+        "W2"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "shaman",
+      "name_zh": "萨满",
+      "name_en": "Shaman",
+      "hp_l1": 240,
+      "hp_l6": 300,
+      "attack_l1": 20,
+      "attack_l6": 32.5,
+      "attack_type": "buff",
+      "armor": 1,
+      "armor_type": "cloth",
+      "range": 1,
+      "footprint": [
+        1,
+        1
+      ],
+      "population": 1,
+      "cost_gold": 120,
+      "cost_crystal": 250,
+      "facility": "Magic Temple",
+      "trait": "给友军提供约 20%~32.5% 速度增益",
+      "source": [
+        "W2"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "archangel",
+      "name_zh": "大天使",
+      "name_en": "Archangel",
+      "hp_l1": 700,
+      "hp_l6": 980,
+      "attack_l1": 25,
+      "attack_l6": 34,
+      "attack_type": "magic",
+      "armor": 2,
+      "armor_type": "light",
+      "range": 5,
+      "footprint": [
+        2,
+        2
+      ],
+      "population": 5,
+      "cost_gold": 600,
+      "cost_crystal": 1000,
+      "facility": "Magic Temple",
+      "trait": "范围伤害",
+      "source": [
+        "W2"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "iron_wheel",
+      "name_zh": "钢铁之轮",
+      "name_en": "Iron Wheel",
+      "hp_l1": 520,
+      "hp_l6": 910,
+      "attack_l1": 40,
+      "attack_l6": 57,
+      "attack_type": "piercing",
+      "armor": 2,
+      "armor_type": "light",
+      "range": 6,
+      "footprint": [
+        2,
+        2
+      ],
+      "population": 4,
+      "cost_gold": 800,
+      "cost_crystal": 600,
+      "facility": "Mech Lab",
+      "trait": "弹射攻击，最多跳转 3 次",
+      "source": [
+        "W2"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "troll_cyborg",
+      "name_zh": "机械巨魔",
+      "name_en": "Troll Cyborg",
+      "hp_l1": 1700,
+      "hp_l6": 2125,
+      "attack_l1": 40,
+      "attack_l6": 58,
+      "attack_type": "piercing",
+      "armor": 5,
+      "armor_type": "heavy",
+      "range": 1,
+      "footprint": [
+        2,
+        2
+      ],
+      "population": 8,
+      "cost_gold": 2000,
+      "cost_crystal": 700,
+      "facility": "Mech Lab",
+      "trait": "可同时攻击前方两个近战目标",
+      "source": [
+        "W2"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "dwarven_hurler",
+      "name_zh": "矮人投掷手",
+      "name_en": "Dwarven Hurler",
+      "hp_l1": 330,
+      "hp_l6": 1002,
+      "attack_l1": 16,
+      "attack_l6": 49.5,
+      "attack_type": "unknown",
+      "armor": 2,
+      "armor_type": "heavy",
+      "range": 3,
+      "footprint": [
+        1,
+        1
+      ],
+      "population": 3,
+      "cost_gold": null,
+      "cost_crystal": null,
+      "facility": "Lava Keep",
+      "trait": "后期兵种；攻击类型公开页解析不完整",
+      "source": [
+        "W2"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "lava_dragon",
+      "name_zh": "熔岩龙",
+      "name_en": "Lava Dragon",
+      "hp_l1": 660,
+      "hp_l6": 2037,
+      "attack_l1": 22,
+      "attack_l6": 64.9,
+      "attack_type": "unknown",
+      "armor": 4,
+      "armor_type": "light",
+      "range": 1,
+      "footprint": null,
+      "population": 5,
+      "cost_gold": null,
+      "cost_crystal": null,
+      "facility": "Lava Keep",
+      "trait": "后期兵种；占格公开数据缺失",
+      "source": [
+        "W2"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "skeleton_mage",
+      "name_zh": "骷髅法师",
+      "name_en": "Skeleton Mage",
+      "hp_l1": 270,
+      "hp_l6": 820,
+      "attack_l1": 15,
+      "attack_l6": 45,
+      "attack_type": "magic",
+      "armor": 2,
+      "armor_type": "unknown",
+      "range": 6,
+      "footprint": [
+        1,
+        1
+      ],
+      "population": 3,
+      "cost_gold": null,
+      "cost_crystal": null,
+      "facility": "Black Hall",
+      "trait": "后期远程法术兵种",
+      "source": [
+        "W2"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "ghost_assassin",
+      "name_zh": "幽灵刺客",
+      "name_en": "Ghost Assassin",
+      "hp_l1": 260,
+      "hp_l6": 950,
+      "attack_l1": 19.3,
+      "attack_l6": 55.7,
+      "attack_type": "piercing",
+      "armor": 2,
+      "armor_type": "cloth",
+      "range": 4,
+      "footprint": [
+        1,
+        1
+      ],
+      "population": 3,
+      "cost_gold": null,
+      "cost_crystal": null,
+      "facility": "Black Hall",
+      "trait": "后期高成长穿刺兵种",
+      "source": [
+        "W2"
+      ],
+      "status": "partial"
+    }
+  ],
+  "spells": [
+    {
+      "id": "shattering_strike",
+      "name_zh": "破碎打击",
+      "name_en": "Shattering Strike",
+      "category": "melee",
+      "unlock_level": 1,
+      "base_value": 10,
+      "cooldown_seconds": 13,
+      "upgrade_cost_mojo": 5,
+      "breakdown_element": 1,
+      "targeting": "近身范围",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "sorrow_smash",
+      "name_zh": "悲恸重击",
+      "name_en": "Sorrow Smash",
+      "category": "melee",
+      "unlock_level": 9,
+      "base_value": 40,
+      "cooldown_seconds": 13,
+      "upgrade_cost_mojo": 90,
+      "breakdown_element": 18,
+      "targeting": "近身范围",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "air_bash",
+      "name_zh": "空气冲击",
+      "name_en": "Air Bash",
+      "category": "melee",
+      "unlock_level": 13,
+      "base_value": 83,
+      "cooldown_seconds": 13,
+      "upgrade_cost_mojo": 240,
+      "breakdown_element": 48,
+      "targeting": "近身范围",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "blade_of_fate",
+      "name_zh": "命运之刃",
+      "name_en": "Blade of Fate",
+      "category": "melee",
+      "unlock_level": 31,
+      "base_value": 122,
+      "cooldown_seconds": 13,
+      "upgrade_cost_mojo": 1299,
+      "breakdown_element": 260,
+      "targeting": "近身范围",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "fire_blast",
+      "name_zh": "烈焰冲击",
+      "name_en": "Fire Blast",
+      "category": "directional",
+      "unlock_level": 3,
+      "base_value": 12,
+      "cooldown_seconds": 15,
+      "upgrade_cost_mojo": 20,
+      "breakdown_element": 4,
+      "targeting": "方向直线",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "blue_flare",
+      "name_zh": "蓝焰",
+      "name_en": "Blue Flare",
+      "category": "directional",
+      "unlock_level": 10,
+      "base_value": 24,
+      "cooldown_seconds": 15,
+      "upgrade_cost_mojo": 120,
+      "breakdown_element": 24,
+      "targeting": "方向直线",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "mystical_blast",
+      "name_zh": "秘法冲击",
+      "name_en": "Mystical Blast",
+      "category": "directional",
+      "unlock_level": 21,
+      "base_value": 117,
+      "cooldown_seconds": 15,
+      "upgrade_cost_mojo": 600,
+      "breakdown_element": 120,
+      "targeting": "方向直线",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "scourge_of_doom",
+      "name_zh": "末日灾厄",
+      "name_en": "Scourge of Doom",
+      "category": "targetable",
+      "unlock_level": 7,
+      "base_value": 8,
+      "cooldown_seconds": 17,
+      "upgrade_cost_mojo": 50,
+      "breakdown_element": 10,
+      "targeting": "指定目标",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "blue_blast",
+      "name_zh": "蓝色爆破",
+      "name_en": "Blue Blast",
+      "category": "targetable",
+      "unlock_level": 11,
+      "base_value": 18,
+      "cooldown_seconds": 17,
+      "upgrade_cost_mojo": 160,
+      "breakdown_element": 32,
+      "targeting": "指定目标",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "demon_blast",
+      "name_zh": "恶魔爆破",
+      "name_en": "Demon Blast",
+      "category": "targetable",
+      "unlock_level": 22,
+      "base_value": 63,
+      "cooldown_seconds": 17,
+      "upgrade_cost_mojo": 800,
+      "breakdown_element": 160,
+      "targeting": "指定目标",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "shattering_light",
+      "name_zh": "破碎之光",
+      "name_en": "Shattering Light",
+      "category": "targetable",
+      "unlock_level": 16,
+      "base_value": 86,
+      "cooldown_seconds": 15,
+      "upgrade_cost_mojo": 500,
+      "breakdown_element": 100,
+      "targeting": "指定目标/区域",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "voodoo_strike",
+      "name_zh": "巫毒打击",
+      "name_en": "Voodoo Strike",
+      "category": "voodoo",
+      "unlock_level": 15,
+      "base_value": 33,
+      "cooldown_seconds": 22,
+      "upgrade_cost_mojo": 400,
+      "breakdown_element": 80,
+      "targeting": "持续/诅咒",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "angry_bones",
+      "name_zh": "愤怒骸骨",
+      "name_en": "Angry Bones",
+      "category": "voodoo",
+      "unlock_level": 20,
+      "base_value": 54,
+      "cooldown_seconds": 22,
+      "upgrade_cost_mojo": 700,
+      "breakdown_element": 140,
+      "targeting": "持续/诅咒",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "deep_purple",
+      "name_zh": "深紫",
+      "name_en": "Deep Purple",
+      "category": "voodoo",
+      "unlock_level": 28,
+      "base_value": 69,
+      "cooldown_seconds": 22,
+      "upgrade_cost_mojo": 999,
+      "breakdown_element": 200,
+      "targeting": "持续/诅咒",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "footman_spirit",
+      "name_zh": "步兵之魂",
+      "name_en": "Footman's Spirit",
+      "category": "summon",
+      "unlock_level": 5,
+      "base_value": null,
+      "cooldown_seconds": 12,
+      "upgrade_cost_mojo": 30,
+      "breakdown_element": 6,
+      "targeting": "召唤",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "troll_spirit",
+      "name_zh": "巨魔之魂",
+      "name_en": "Troll's Spirit",
+      "category": "summon",
+      "unlock_level": 8,
+      "base_value": null,
+      "cooldown_seconds": 12,
+      "upgrade_cost_mojo": 70,
+      "breakdown_element": 14,
+      "targeting": "召唤",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "archer_spirit",
+      "name_zh": "弓手之魂",
+      "name_en": "Archer's Spirit",
+      "category": "summon",
+      "unlock_level": 12,
+      "base_value": null,
+      "cooldown_seconds": 12,
+      "upgrade_cost_mojo": 200,
+      "breakdown_element": 40,
+      "targeting": "召唤",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "holy_light",
+      "name_zh": "圣光",
+      "name_en": "Holy Light",
+      "category": "healing",
+      "unlock_level": 14,
+      "base_value": 100,
+      "cooldown_seconds": 15,
+      "upgrade_cost_mojo": 300,
+      "breakdown_element": 60,
+      "targeting": "治疗",
+      "source": [
+        "W3"
+      ],
+      "status": "community_verified"
+    }
+  ],
+  "buildings": [
+    {
+      "id": "castle",
+      "name_zh": "城堡",
+      "name_en": "Castle",
+      "category": "default",
+      "size": [
+        9,
+        9
+      ],
+      "unlock_level": 1,
+      "gold": null,
+      "crystal": null,
+      "function": "主城、城墙耐久、等级与功能入口",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "hero_altar",
+      "name_zh": "英雄祭坛",
+      "name_en": "Altar of Hero",
+      "category": "default",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": 1,
+      "gold": null,
+      "crystal": null,
+      "function": "英雄相关入口",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "casino",
+      "name_zh": "赌场",
+      "name_en": "Casino",
+      "category": "default",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": 1,
+      "gold": null,
+      "crystal": null,
+      "function": "抽奖/随机奖励",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "house",
+      "name_zh": "住宅",
+      "name_en": "House",
+      "category": "economy",
+      "size": [
+        3,
+        3
+      ],
+      "unlock_level": 1,
+      "gold": 500,
+      "crystal": 200,
+      "function": "增加人口；后期资料显示 1 级约 +10，早期攻略曾写 +5",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "gold_mine",
+      "name_zh": "金矿",
+      "name_en": "Gold Mine",
+      "category": "economy",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": 1,
+      "gold": 6000,
+      "crystal": 800,
+      "function": "1 级约 330 金币/小时",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "crystal_mine",
+      "name_zh": "水晶矿",
+      "name_en": "Crystal Mine",
+      "category": "economy",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": 1,
+      "gold": 12000,
+      "crystal": 0,
+      "function": "1 级约 66 水晶/小时",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "prison_cell",
+      "name_zh": "监狱",
+      "name_en": "Prison Cell",
+      "category": "economy",
+      "size": [
+        4,
+        4
+      ],
+      "unlock_level": 18,
+      "gold": 5000,
+      "crystal": 1000,
+      "function": "俘虏系统与额外收益",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "warehouse",
+      "name_zh": "仓库",
+      "name_en": "Warehouse",
+      "category": "economy",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": 1,
+      "gold": 1000,
+      "crystal": 200,
+      "function": "1 级保护约 6000 金币 / 1500 水晶",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "portal",
+      "name_zh": "传送门",
+      "name_en": "Portal",
+      "category": "economy",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": null,
+      "gold": 500000,
+      "crystal": null,
+      "function": "开启第二帝国/第二城市",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "alchemy_lab",
+      "name_zh": "炼金实验室",
+      "name_en": "Alchemy Lab",
+      "category": "economy",
+      "size": [
+        6,
+        6
+      ],
+      "unlock_level": null,
+      "gold": 5000,
+      "crystal": 2000,
+      "function": "宝石相关",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "embassy",
+      "name_zh": "大使馆",
+      "name_en": "Embassy",
+      "category": "alliance",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": null,
+      "gold": 20000,
+      "crystal": null,
+      "function": "联盟入口",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "spar_mine",
+      "name_zh": "魔晶矿",
+      "name_en": "Spar Mine",
+      "category": "economy",
+      "size": [
+        4,
+        4
+      ],
+      "unlock_level": null,
+      "gold": 0,
+      "crystal": 0,
+      "function": "约每 24 小时产 1 Magic Spar；建造价约 99 绑定 Mojo",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "barracks",
+      "name_zh": "兵营",
+      "name_en": "Barracks",
+      "category": "military",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": 1,
+      "gold": 2000,
+      "crystal": 0,
+      "function": "招募步兵、巨魔",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "shooting_range",
+      "name_zh": "射击场",
+      "name_en": "Shooting Range",
+      "category": "military",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": null,
+      "gold": 3000,
+      "crystal": 500,
+      "function": "招募弓箭手、忍者",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "magic_library",
+      "name_zh": "魔法图书馆",
+      "name_en": "Magic Library",
+      "category": "military",
+      "size": null,
+      "unlock_level": null,
+      "gold": null,
+      "crystal": null,
+      "function": "招募牧师、法师",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "stable",
+      "name_zh": "马厩",
+      "name_en": "Stable",
+      "category": "military",
+      "size": null,
+      "unlock_level": null,
+      "gold": null,
+      "crystal": null,
+      "function": "招募骑士、狼骑兵",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "magic_temple",
+      "name_zh": "魔法神殿",
+      "name_en": "Magic Temple",
+      "category": "military",
+      "size": null,
+      "unlock_level": null,
+      "gold": null,
+      "crystal": null,
+      "function": "招募萨满、大天使",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "mech_lab",
+      "name_zh": "机械实验室",
+      "name_en": "Mech Lab",
+      "category": "military",
+      "size": null,
+      "unlock_level": null,
+      "gold": null,
+      "crystal": null,
+      "function": "招募钢铁之轮、机械巨魔",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "lava_keep",
+      "name_zh": "熔岩堡",
+      "name_en": "Lava Keep",
+      "category": "military",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": null,
+      "gold": 40000,
+      "crystal": 20000,
+      "function": "招募矮人投掷手、熔岩龙",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "black_hall",
+      "name_zh": "黑暗大厅",
+      "name_en": "Black Hall",
+      "category": "military",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": null,
+      "gold": 80000,
+      "crystal": 40000,
+      "function": "招募骷髅法师、幽灵刺客",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "blacksmith",
+      "name_zh": "铁匠铺",
+      "name_en": "Blacksmith",
+      "category": "upgrade",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": null,
+      "gold": 5000,
+      "crystal": 1000,
+      "function": "近战兵种升级",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "wind_shrine",
+      "name_zh": "风之神殿",
+      "name_en": "Wind Shrine",
+      "category": "upgrade",
+      "size": [
+        7,
+        7
+      ],
+      "unlock_level": null,
+      "gold": 5000,
+      "crystal": 1000,
+      "function": "远程兵种升级",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "magic_altar",
+      "name_zh": "魔法祭坛",
+      "name_en": "Magic Altar",
+      "category": "upgrade",
+      "size": [
+        7,
+        7
+      ],
+      "unlock_level": null,
+      "gold": 18000,
+      "crystal": 3600,
+      "function": "魔法兵种升级",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    },
+    {
+      "id": "research_center",
+      "name_zh": "研究中心",
+      "name_en": "Research Center",
+      "category": "upgrade",
+      "size": [
+        6,
+        6
+      ],
+      "unlock_level": 15,
+      "gold": null,
+      "crystal": null,
+      "function": "科技研究",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "pet_pen",
+      "name_zh": "宠物栏",
+      "name_en": "Pet Pen",
+      "category": "upgrade",
+      "size": [
+        6,
+        6
+      ],
+      "unlock_level": 45,
+      "gold": null,
+      "crystal": null,
+      "function": "宠物养成",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "partial"
+    },
+    {
+      "id": "magic_tower",
+      "name_zh": "魔法塔",
+      "name_en": "Magic Tower",
+      "category": "upgrade",
+      "size": [
+        5,
+        5
+      ],
+      "unlock_level": null,
+      "gold": 8000,
+      "crystal": 1500,
+      "function": "魔法研究/相关成长",
+      "source": [
+        "W4",
+        "G1"
+      ],
+      "status": "community_verified"
+    }
+  ],
+  "technologies": [
+    {
+      "id": "gold_production",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    },
+    {
+      "id": "crystal_production",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    },
+    {
+      "id": "unit_evasion",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    },
+    {
+      "id": "movement_speed",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    },
+    {
+      "id": "recruitment_speed",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    },
+    {
+      "id": "castle_wall_strength",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    },
+    {
+      "id": "unit_health",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    },
+    {
+      "id": "normal_attack",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    },
+    {
+      "id": "piercing_attack",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    },
+    {
+      "id": "magic_attack",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    },
+    {
+      "id": "attack_speed",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    },
+    {
+      "id": "critical_chance",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    },
+    {
+      "id": "damage_resistance",
+      "unlock_level": 15,
+      "max_level": null,
+      "source": [
+        "W4"
+      ],
+      "status": "category_verified_value_unknown"
+    }
+  ],
+  "progression_unlocks": [
+    {
+      "level": 1,
+      "feature": "基础城市、英雄、招募、冒险"
+    },
+    {
+      "level": 6,
+      "feature": "玩家 PvP / 竞技相关入口"
+    },
+    {
+      "level": 15,
+      "feature": "研究中心与科技"
+    },
+    {
+      "level": 18,
+      "feature": "监狱/俘虏系统"
+    },
+    {
+      "level": 24,
+      "feature": "Fort / 第二英雄（公开资料常见值）"
+    },
+    {
+      "level": 30,
+      "feature": "Seal 冒险线最低等级附近"
+    },
+    {
+      "level": 45,
+      "feature": "宠物栏、宠物系统；批量招募功能在部分资料中也为 45"
+    },
+    {
+      "level": 55,
+      "feature": "Revenge 冒险线常见进入区间 55~60"
+    }
+  ],
+  "pets": [
+    {
+      "hero_id": "behemoth",
+      "name_en": "Fire Cat",
+      "name_zh": "火猫",
+      "unlock_level": 45,
+      "skills": [
+        {
+          "pet_level": 12,
+          "name": "Dizzy Thunder"
+        },
+        {
+          "pet_level": 15,
+          "name": "Saint's Light"
+        }
+      ],
+      "appearance_changes": [
+        20,
+        30,
+        60
+      ],
+      "source": [
+        "W5"
+      ]
+    },
+    {
+      "hero_id": "succubus",
+      "name_en": "Wee Devil",
+      "name_zh": "小恶魔",
+      "unlock_level": 45,
+      "skills": [
+        {
+          "pet_level": 12,
+          "name": "Dizzy Thunder"
+        },
+        {
+          "pet_level": 15,
+          "name": "Saint's Light"
+        }
+      ],
+      "appearance_changes": [
+        20,
+        30,
+        60
+      ],
+      "source": [
+        "W5"
+      ]
+    },
+    {
+      "hero_id": "berserker",
+      "name_en": "Jungle Ape",
+      "name_zh": "丛林猿",
+      "unlock_level": 45,
+      "skills": [
+        {
+          "pet_level": 12,
+          "name": "Dizzy Thunder"
+        },
+        {
+          "pet_level": 15,
+          "name": "Saint's Light"
+        }
+      ],
+      "appearance_changes": [
+        20,
+        30,
+        60
+      ],
+      "source": [
+        "W5"
+      ]
+    }
+  ],
+  "alliance": {
+    "create_cost": {
+      "gold": 300000,
+      "crystal": 150000
+    },
+    "sea_war_ships": [
+      {
+        "id": "small_ship",
+        "population": 600,
+        "armor": 3000,
+        "speed": 30,
+        "cost_gold": 50000,
+        "cost_crystal": 30000
+      },
+      {
+        "id": "frigate",
+        "population": 700,
+        "armor": 5000,
+        "speed": 24,
+        "cost_gold": 200000,
+        "cost_crystal": 200000
+      },
+      {
+        "id": "ironclad",
+        "population": 800,
+        "armor": 9000,
+        "speed": 20,
+        "cost_gold": null,
+        "cost_crystal": null
+      }
+    ],
+    "source": [
+      "W6"
+    ],
+    "status": "partial"
+  },
+  "sources": [
+    {
+      "id": "O1",
+      "name": "Camel Games 官方《Little Empire》产品页与停服公告",
+      "type": "官方",
+      "supports": "游戏定位、3 名英雄、12 类基础兵种、建筑/联盟/竞技/冒险概述、停服时间",
+      "reliability": "高"
+    },
+    {
+      "id": "A1",
+      "name": "APKPure《Little Empire》应用归档",
+      "type": "应用商店归档",
+      "supports": "Android 版本 1.26.4、更新时间、安装包体积、最低系统要求、历史版本",
+      "reliability": "中高"
+    },
+    {
+      "id": "A2",
+      "name": "Uptodown / GameFAQs 应用归档",
+      "type": "应用归档",
+      "supports": "包名、发行年代交叉验证",
+      "reliability": "中"
+    },
+    {
+      "id": "G1",
+      "name": "Gamezebo Little Empire Quick Start Guide",
+      "type": "媒体攻略",
+      "supports": "早期 UI、资源栏、城市建造、招募、战斗部署、法术手动释放、等级 6 开启 PvP",
+      "reliability": "中高"
+    },
+    {
+      "id": "W1",
+      "name": "Little Empire Wiki - Heroes / Hero System",
+      "type": "玩家 Wiki",
+      "supports": "三英雄基础属性、定位、英雄技能、勋章、第二英雄",
+      "reliability": "中"
+    },
+    {
+      "id": "W2",
+      "name": "Little Empire Wiki - Units / Attack & Armor",
+      "type": "玩家 Wiki",
+      "supports": "16 个可用兵种、基础与高级属性、克制、伤害公式、占格、人口与招募成本",
+      "reliability": "中"
+    },
+    {
+      "id": "W3",
+      "name": "Little Empire Wiki - Spells",
+      "type": "玩家 Wiki",
+      "supports": "公开法术等级、伤害/治疗、冷却、升级消耗",
+      "reliability": "中"
+    },
+    {
+      "id": "W4",
+      "name": "Little Empire Wiki - Buildings / Resources / Research",
+      "type": "玩家 Wiki",
+      "supports": "建筑尺寸与部分成本、资源用途、科技类别",
+      "reliability": "中"
+    },
+    {
+      "id": "W5",
+      "name": "Little Empire Wiki - Adventures / Tasks / Reputation / Pets / Runes / Gems",
+      "type": "玩家 Wiki",
+      "supports": "中后期系统、开放等级、奖励与成长方向",
+      "reliability": "中"
+    },
+    {
+      "id": "W6",
+      "name": "Little Empire Wiki - Sea War / Battlefield / Alliance",
+      "type": "玩家 Wiki",
+      "supports": "联盟、海战船只、战场模式的公开描述与部分数值",
+      "reliability": "中"
+    },
+    {
+      "id": "C1",
+      "name": "公开玩家技术资料：6×7 + 1×7 + 6×7 战场布局",
+      "type": "社区技术资料",
+      "supports": "战场为 6 行 × 15 列，双方各 7 列，中间 1 列隔离带",
+      "reliability": "中"
+    }
+  ]
+}
