@@ -57,11 +57,20 @@ interface ReplayTrace {
   tone: 'projectile' | 'spell' | 'impact'
 }
 
+interface ReplayBurst {
+  id: string
+  x: number
+  y: number
+  size: number
+  tone: 'spell' | 'impact' | 'heal'
+}
+
 interface ReplayFrameState {
   entities: ReplayEntityState[]
   highlights: { attackers: string[]; targets: string[] }
   effects: ReplayFx[]
   traces: ReplayTrace[]
+  bursts: ReplayBurst[]
 }
 
 const initialBuildingLayout: Record<string, Pick<BuildingSaveState, 'row' | 'col'>> = {
@@ -330,6 +339,7 @@ const buildReplayFrame = (baseEntities: ReplayEntityState[], battleResult: Battl
   const tickEvents = battleResult.events.filter((event) => event.tick === currentTick)
   const effects: ReplayFx[] = []
   const traces: ReplayTrace[] = []
+  const bursts: ReplayBurst[] = []
 
   for (const event of tickEvents) {
     const source = entities.find((entity) => entity.entityId === event.sourceId)
@@ -350,6 +360,14 @@ const buildReplayFrame = (baseEntities: ReplayEntityState[], battleResult: Battl
         width: Math.hypot(dx, dy),
         angle: (Math.atan2(dy, dx) * 180) / Math.PI,
         tone: event.type === 'spell' ? 'spell' : source.col === target.col || source.row === target.row ? 'impact' : 'projectile',
+      })
+
+      bursts.push({
+        id: `${currentTick}-${event.type}-burst-${target.entityId}`,
+        x: target.col * 48 + target.width * 24,
+        y: target.row * 48 + target.height * 24,
+        size: event.type === 'spell' ? Math.max(target.width, target.height) * 52 : Math.max(target.width, target.height) * 34,
+        tone: event.type === 'spell' ? (event.note?.includes('治疗') ? 'heal' : 'spell') : 'impact',
       })
     }
 
@@ -386,6 +404,7 @@ const buildReplayFrame = (baseEntities: ReplayEntityState[], battleResult: Battl
     },
     effects,
     traces,
+    bursts,
   }
 }
 
@@ -497,6 +516,7 @@ function App() {
   const [replayHighlights, setReplayHighlights] = useState<{ attackers: string[]; targets: string[] }>({ attackers: [], targets: [] })
   const [replayEffects, setReplayEffects] = useState<ReplayFx[]>([])
   const [replayTraces, setReplayTraces] = useState<ReplayTrace[]>([])
+  const [replayBursts, setReplayBursts] = useState<ReplayBurst[]>([])
   const [battleIntroCountdown, setBattleIntroCountdown] = useState(0)
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -558,6 +578,7 @@ function App() {
     setReplayHighlights({ attackers: [], targets: [] })
     setReplayEffects([])
     setReplayTraces([])
+    setReplayBursts([])
     setBattleIntroCountdown(3)
   }, [battleResult, replaySourcePlacements])
 
@@ -605,6 +626,7 @@ function App() {
     setReplayHighlights(frame.highlights)
     setReplayEffects(frame.effects)
     setReplayTraces(frame.traces)
+    setReplayBursts(frame.bursts)
   }, [battleResult, replaySourcePlacements, replayTick])
 
   const exportSave = () => {
@@ -839,6 +861,7 @@ function App() {
     setReplayHighlights({ attackers: [], targets: [] })
     setReplayEffects([])
     setReplayTraces([])
+    setReplayBursts([])
     setBattleIntroCountdown(0)
   }
 
@@ -850,6 +873,7 @@ function App() {
     setReplayHighlights({ attackers: [], targets: [] })
     setReplayEffects([])
     setReplayTraces([])
+    setReplayBursts([])
     setBattleIntroCountdown(0)
   }
 
@@ -1216,7 +1240,7 @@ function App() {
         <article className="panel wide-panel">
           <div className="panel-header">
             <h2>6x15 阵型编辑</h2>
-            <p>{showBattleStage ? '战斗开始后，这里会直接播放双方推进、远程弹道、法术命中和交战动画。' : '左侧 0-6 列为我方部署区。可从库存拖拽上阵，也可拖动已部署单位调整位置。'}</p>
+            <p>{showBattleStage ? '战斗开始后，这里会直接播放双方推进、远程弹道、法术落点圈、命中脉冲和交战动画。' : '左侧 0-6 列为我方部署区。可从库存拖拽上阵，也可拖动已部署单位调整位置。'}</p>
           </div>
           {!showBattleStage && !attackerValidation.ok ? <p className="warning-text">当前阵型: {attackerValidation.reason}</p> : null}
           {showBattleStage ? (
@@ -1273,6 +1297,18 @@ function App() {
                       style={{
                         width: `${trace.width}px`,
                         transform: `translate(${trace.x}px, ${trace.y}px) rotate(${trace.angle}deg)`,
+                      }}
+                    />
+                  ))}
+                  {replayBursts.map((burst) => (
+                    <div
+                      key={burst.id}
+                      className={`replay-burst ${burst.tone}`}
+                      style={{
+                        width: `${burst.size}px`,
+                        height: `${burst.size}px`,
+                        left: `${burst.x - burst.size / 2}px`,
+                        top: `${burst.y - burst.size / 2}px`,
                       }}
                     />
                   ))}

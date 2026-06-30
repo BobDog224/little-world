@@ -626,6 +626,30 @@
   animation: impact-pulse 260ms ease-out forwards;
 }
 
+.replay-burst {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  animation: burst-ring 360ms ease-out forwards;
+}
+
+.replay-burst.impact {
+  border: 2px solid rgba(255, 221, 151, 0.9);
+  background: radial-gradient(circle, rgba(255, 226, 164, 0.25), rgba(255, 226, 164, 0));
+}
+
+.replay-burst.spell {
+  border: 3px solid rgba(255, 120, 75, 0.92);
+  background: radial-gradient(circle, rgba(255, 136, 92, 0.34), rgba(255, 136, 92, 0));
+  box-shadow: 0 0 24px rgba(255, 120, 75, 0.45);
+}
+
+.replay-burst.heal {
+  border: 3px solid rgba(130, 241, 170, 0.9);
+  background: radial-gradient(circle, rgba(130, 241, 170, 0.28), rgba(130, 241, 170, 0));
+  box-shadow: 0 0 22px rgba(130, 241, 170, 0.38);
+}
+
 .replay-fx.damage {
   color: #ff8a7a;
 }
@@ -703,6 +727,18 @@
   to {
     opacity: 0;
     scale: 1.45;
+  }
+}
+
+@keyframes burst-ring {
+  from {
+    opacity: 0.92;
+    transform: scale(0.35);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.12);
   }
 }
 
