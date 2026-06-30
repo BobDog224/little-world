@@ -85,7 +85,7 @@ export interface BattleInput {
 
 export interface BattleEvent {
   tick: number
-  type: 'move' | 'attack' | 'heal' | 'death' | 'spell'
+  type: 'move' | 'attack' | 'heal' | 'buff' | 'death' | 'spell'
   sourceId?: string
   targetId?: string
   value?: number

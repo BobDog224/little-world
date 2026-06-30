@@ -21,6 +21,7 @@ interface BattleEntity {
   height: number
   maxHp: number
   hp: number
+  baseAttack: number
   attack: number
   armor: number
   armorType: ArmorType
@@ -30,7 +31,14 @@ interface BattleEntity {
   moveIntervalTicks: number
   nextAttackTick: number
   nextMoveTick: number
+  attackBuff: number
+  attackBuffUntilTick: number
 }
+
+const shamanBuffAmount = 6
+const shamanBuffDurationTicks = 36
+const ironWheelBounceRatio = 0.6
+const archangelSplashRatio = 0.5
 
 const counterMatrix: Record<
   'normal' | 'piercing' | 'magic' | 'hero',
@@ -90,6 +98,7 @@ const createEntities = (army: ArmySnapshot, side: Side): BattleEntity[] =>
       height: template.footprint.height,
       maxHp: stats.hp,
       hp: stats.hp,
+      baseAttack: stats.attack,
       attack: stats.attack,
       armor: stats.armor,
       armorType: template.armorType,
@@ -99,6 +108,8 @@ const createEntities = (army: ArmySnapshot, side: Side): BattleEntity[] =>
       moveIntervalTicks: stats.moveIntervalTicks,
       nextAttackTick: 0,
       nextMoveTick: 0,
+      attackBuff: 0,
+      attackBuffUntilTick: 0,
     }
   })
 
@@ -160,19 +171,30 @@ const chooseHealTarget = (source: BattleEntity, entities: BattleEntity[]) =>
     .filter((entity) => getDistance(source, entity) <= source.range - 1)
     .sort((left, right) => left.hp / left.maxHp - right.hp / right.maxHp || left.entityId.localeCompare(right.entityId))[0]
 
+const chooseSupportTarget = (source: BattleEntity, entities: BattleEntity[]) =>
+  getEntitiesInOrder(entities)
+    .filter((entity) => entity.side === source.side && entity.entityId !== source.entityId)
+    .filter((entity) => getDistance(source, entity) <= source.range - 1)
+    .sort((left, right) => getDistance(source, left) - getDistance(source, right) || left.entityId.localeCompare(right.entityId))[0]
+
 const isTargetInRange = (source: BattleEntity, target: BattleEntity) => getDistance(source, target) <= source.range - 1
 
-const getDamage = (source: BattleEntity, target: BattleEntity) => {
+const getAttackPower = (entity: BattleEntity, tick: number) =>
+  entity.baseAttack + (tick < entity.attackBuffUntilTick ? entity.attackBuff : 0)
+
+const getDamage = (source: BattleEntity, target: BattleEntity, tick: number) => {
+  const attackPower = getAttackPower(source, tick)
+
   if (source.attackType === 'hero') {
-    return Math.max(1, Math.floor((source.attack - target.armor) * 1.2))
+    return Math.max(1, Math.floor((attackPower - target.armor) * 1.2))
   }
 
   if (source.attackType === 'heal') {
-    return source.attack
+    return attackPower
   }
 
   const matrix = counterMatrix[source.attackType]
-  const raw = source.attack - target.armor
+  const raw = attackPower - target.armor
 
   if (matrix.strong.includes(target.armorType)) {
     return Math.max(1, Math.floor(raw * 2))
@@ -183,6 +205,46 @@ const getDamage = (source: BattleEntity, target: BattleEntity) => {
   }
 
   return Math.max(1, Math.floor(raw))
+}
+
+const getTargetsInRange = (source: BattleEntity, entities: BattleEntity[]) =>
+  getEntitiesInOrder(entities)
+    .filter((entity) => entity.side !== source.side)
+    .filter((entity) => isTargetInRange(source, entity))
+    .sort((left, right) => {
+      const leftDistance = getDistance(source, left)
+      const rightDistance = getDistance(source, right)
+
+      return leftDistance - rightDistance || left.entityId.localeCompare(right.entityId)
+    })
+
+const getAreaTargets = (primary: BattleEntity, entities: BattleEntity[]) =>
+  getEntitiesInOrder(entities)
+    .filter((entity) => entity.side === primary.side && entity.entityId !== primary.entityId)
+    .filter((entity) => getDistance(primary, entity) <= 1)
+
+const applyDamage = (
+  tick: number,
+  source: BattleEntity,
+  target: BattleEntity,
+  damage: number,
+  events: BattleEvent[],
+  totalDamageBySide: Record<Side, number>,
+  note?: string,
+) => {
+  target.hp = Math.max(0, target.hp - damage)
+  totalDamageBySide[source.side] += damage
+  events.push({ tick, type: 'attack', sourceId: source.entityId, targetId: target.entityId, value: damage, note })
+
+  if (target.hp === 0) {
+    events.push({ tick, type: 'death', targetId: target.entityId, note: `${target.name} 倒下` })
+  }
+}
+
+const applyShamanBuff = (tick: number, source: BattleEntity, target: BattleEntity, events: BattleEvent[]) => {
+  target.attackBuff = shamanBuffAmount
+  target.attackBuffUntilTick = tick + shamanBuffDurationTicks
+  events.push({ tick, type: 'buff', sourceId: source.entityId, targetId: target.entityId, value: shamanBuffAmount, note: `${source.name} 提升攻击` })
 }
 
 const collidesAt = (entity: BattleEntity, nextCol: number, entities: BattleEntity[]) => {
@@ -335,11 +397,24 @@ export const simulateBattle = (input: BattleInput): BattleResult => {
         if (entity.attackType === 'heal') {
           const ally = chooseHealTarget(entity, entities)
 
-          if (ally && tick >= entity.nextAttackTick) {
-            const restored = Math.min(entity.attack, ally.maxHp - ally.hp)
-            ally.hp += restored
-            entity.nextAttackTick = tick + entity.attackIntervalTicks
-            events.push({ tick, type: 'heal', sourceId: entity.entityId, targetId: ally.entityId, value: restored })
+          if (tick >= entity.nextAttackTick) {
+            if (ally) {
+              const restored = Math.min(getDamage(entity, ally, tick), ally.maxHp - ally.hp)
+              ally.hp += restored
+              entity.nextAttackTick = tick + entity.attackIntervalTicks
+              events.push({ tick, type: 'heal', sourceId: entity.entityId, targetId: ally.entityId, value: restored })
+
+              if (entity.unitId === 'shaman') {
+                applyShamanBuff(tick, entity, ally, events)
+              }
+            } else if (entity.unitId === 'shaman') {
+              const supportTarget = chooseSupportTarget(entity, entities)
+
+              if (supportTarget) {
+                entity.nextAttackTick = tick + entity.attackIntervalTicks
+                applyShamanBuff(tick, entity, supportTarget, events)
+              }
+            }
           }
 
           continue
@@ -353,14 +428,44 @@ export const simulateBattle = (input: BattleInput): BattleResult => {
 
         if (isTargetInRange(entity, target) && tick >= entity.nextAttackTick) {
           const jitter = rng.next() % 2
-          const damage = getDamage(entity, target) + jitter
-          target.hp = Math.max(0, target.hp - damage)
-          totalDamageBySide[entity.side] += damage
+          const damage = getDamage(entity, target, tick) + jitter
           entity.nextAttackTick = tick + entity.attackIntervalTicks
-          events.push({ tick, type: 'attack', sourceId: entity.entityId, targetId: target.entityId, value: damage })
+          applyDamage(tick, entity, target, damage, events, totalDamageBySide)
 
-          if (target.hp === 0) {
-            events.push({ tick, type: 'death', targetId: target.entityId, note: `${target.name} 倒下` })
+          if (entity.unitId === 'ninja') {
+            for (const splashTarget of getTargetsInRange(entity, entities).filter((candidate) => candidate.entityId !== target.entityId).slice(0, 2)) {
+              applyDamage(tick, entity, splashTarget, damage, events, totalDamageBySide, `${entity.name} 三连斩`)
+            }
+          }
+
+          if (entity.unitId === 'iron_wheel') {
+            const bounceTarget = getTargetsInRange(entity, entities).find((candidate) => candidate.entityId !== target.entityId)
+
+            if (bounceTarget) {
+              applyDamage(
+                tick,
+                entity,
+                bounceTarget,
+                Math.max(1, Math.floor(damage * ironWheelBounceRatio)),
+                events,
+                totalDamageBySide,
+                `${entity.name} 弹射`,
+              )
+            }
+          }
+
+          if (entity.unitId === 'archangel') {
+            for (const areaTarget of getAreaTargets(target, entities)) {
+              applyDamage(
+                tick,
+                entity,
+                areaTarget,
+                Math.max(1, Math.floor(damage * archangelSplashRatio)),
+                events,
+                totalDamageBySide,
+                `${entity.name} 圣焰波及`,
+              )
+            }
           }
 
           continue

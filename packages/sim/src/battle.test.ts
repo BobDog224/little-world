@@ -60,4 +60,94 @@ describe('battle simulation', () => {
     expect(damageEvent).toBeDefined()
     expect(damageEvent?.value).toBeGreaterThanOrEqual(1)
   })
+
+  it('lets ninja hit up to three targets in one attack cycle', () => {
+    const result = simulateBattle({
+      seed: 11,
+      maxTicks: 1,
+      attacker: {
+        placements: [
+          { unitId: 'behemoth', row: 2, col: 0, level: 1 },
+          { unitId: 'ninja', row: 2, col: 6, level: 1 },
+        ],
+      },
+      defender: {
+        placements: [
+          { unitId: 'berserker', row: 2, col: 8, level: 1 },
+          { unitId: 'footman', row: 1, col: 9, level: 1 },
+          { unitId: 'footman', row: 2, col: 10, level: 1 },
+        ],
+      },
+    })
+
+    const ninjaHits = result.events.filter((event) => event.sourceId?.includes('ninja') && event.type === 'attack')
+
+    expect(ninjaHits).toHaveLength(3)
+  })
+
+  it('lets iron wheel bounce to a second target', () => {
+    const result = simulateBattle({
+      seed: 13,
+      maxTicks: 1,
+      attacker: {
+        placements: [
+          { unitId: 'behemoth', row: 2, col: 0, level: 1 },
+          { unitId: 'iron_wheel', row: 1, col: 4, level: 1 },
+        ],
+      },
+      defender: {
+        placements: [
+          { unitId: 'berserker', row: 2, col: 12, level: 1 },
+          { unitId: 'footman', row: 1, col: 9, level: 1 },
+          { unitId: 'footman', row: 2, col: 10, level: 1 },
+        ],
+      },
+    })
+
+    expect(result.events.some((event) => event.note?.includes('弹射'))).toBe(true)
+  })
+
+  it('lets shaman buff allies even when no one needs healing', () => {
+    const result = simulateBattle({
+      seed: 17,
+      maxTicks: 1,
+      attacker: {
+        placements: [
+          { unitId: 'behemoth', row: 2, col: 0, level: 1 },
+          { unitId: 'shaman', row: 2, col: 4, level: 1 },
+          { unitId: 'footman', row: 1, col: 5, level: 1 },
+        ],
+      },
+      defender: {
+        placements: [
+          { unitId: 'berserker', row: 2, col: 12, level: 1 },
+          { unitId: 'footman', row: 1, col: 10, level: 1 },
+        ],
+      },
+    })
+
+    expect(result.events.some((event) => event.type === 'buff' && event.sourceId?.includes('shaman'))).toBe(true)
+  })
+
+  it('lets archangel splash nearby enemies', () => {
+    const result = simulateBattle({
+      seed: 19,
+      maxTicks: 1,
+      attacker: {
+        placements: [
+          { unitId: 'behemoth', row: 2, col: 0, level: 1 },
+          { unitId: 'archangel', row: 1, col: 4, level: 1 },
+        ],
+      },
+      defender: {
+        placements: [
+          { unitId: 'berserker', row: 2, col: 12, level: 1 },
+          { unitId: 'footman', row: 1, col: 9, level: 1 },
+          { unitId: 'footman', row: 2, col: 10, level: 1 },
+        ],
+      },
+    })
+
+    expect(result.events.some((event) => event.note?.includes('圣焰波及'))).toBe(true)
+  })
 })
