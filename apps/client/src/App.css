@@ -501,7 +501,7 @@
   padding: 6px;
   border-radius: 10px;
   color: #fff7e7;
-  transition: transform 140ms linear, opacity 140ms linear, box-shadow 140ms linear;
+  transition: left 140ms linear, top 140ms linear, transform 140ms linear, opacity 140ms linear, box-shadow 140ms linear, filter 140ms linear;
 }
 
 .replay-unit.side-a {
@@ -512,12 +512,52 @@
   background: rgba(181, 62, 62, 0.78);
 }
 
+.unit-facing {
+  position: absolute;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  opacity: 0.72;
+  transform: translateY(-50%);
+}
+
+.replay-unit.side-a .unit-facing {
+  right: -6px;
+  border-left: 8px solid rgba(255, 244, 210, 0.9);
+}
+
+.replay-unit.side-b .unit-facing {
+  left: -6px;
+  border-right: 8px solid rgba(255, 244, 210, 0.9);
+}
+
 .replay-unit.acting {
   box-shadow: 0 0 0 2px rgba(255, 232, 170, 0.8);
 }
 
+.replay-unit.side-a.acting.attack-normal,
+.replay-unit.side-a.acting.attack-hero,
+.replay-unit.side-a.acting.attack-heal {
+  transform: translate(var(--move-x, 0), var(--move-y, 0)) translateX(6px) scale(1.04);
+}
+
+.replay-unit.side-b.acting.attack-normal,
+.replay-unit.side-b.acting.attack-hero,
+.replay-unit.side-b.acting.attack-heal {
+  transform: translate(var(--move-x, 0), var(--move-y, 0)) translateX(-6px) scale(1.04);
+}
+
+.replay-unit.acting.attack-piercing,
+.replay-unit.acting.attack-magic {
+  transform: scale(1.03);
+  filter: brightness(1.14);
+}
+
 .replay-unit.impacted {
   box-shadow: 0 0 18px rgba(255, 146, 122, 0.8);
+  animation: hit-shake 180ms ease-out;
 }
 
 .replay-unit.dead {
@@ -663,6 +703,24 @@
   to {
     opacity: 0;
     scale: 1.45;
+  }
+}
+
+@keyframes hit-shake {
+  0% {
+    translate: 0 0;
+  }
+
+  30% {
+    translate: -3px 0;
+  }
+
+  70% {
+    translate: 3px 0;
+  }
+
+  100% {
+    translate: 0 0;
   }
 }
 

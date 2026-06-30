@@ -30,6 +30,7 @@ interface ReplayEntityState {
   unitId: string
   name: string
   side: 'A' | 'B'
+  attackType: UnitTemplate['attackType']
   row: number
   col: number
   width: number
@@ -277,6 +278,7 @@ const buildReplayEntities = (formation: FormationPlacement[], defender: Formatio
         unitId: placement.unitId,
         name: template.name,
         side,
+        attackType: template.attackType,
         row: placement.row,
         col: placement.col,
         width: template.footprint.width,
@@ -1246,13 +1248,15 @@ function App() {
                   {replayEntities.map((entity) => (
                     <div
                       key={entity.entityId}
-                      className={`replay-unit side-${entity.side.toLowerCase()}${entity.alive ? '' : ' dead'}${replayHighlights.attackers.includes(entity.entityId) ? ' acting' : ''}${replayHighlights.targets.includes(entity.entityId) ? ' impacted' : ''}`}
+                      className={`replay-unit side-${entity.side.toLowerCase()} attack-${entity.attackType}${entity.alive ? '' : ' dead'}${replayHighlights.attackers.includes(entity.entityId) ? ' acting' : ''}${replayHighlights.targets.includes(entity.entityId) ? ' impacted' : ''}`}
                       style={{
                         width: `${entity.width * 48 - 4}px`,
                         height: `${entity.height * 48 - 4}px`,
-                        transform: `translate(${entity.col * 48}px, ${entity.row * 48}px)`,
+                        left: `${entity.col * 48}px`,
+                        top: `${entity.row * 48}px`,
                       }}
                     >
+                      <i className="unit-facing" />
                       <span>{entity.name}</span>
                       <small>
                         {Math.max(0, entity.hp)}/{entity.maxHp}
