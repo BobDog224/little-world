@@ -111,6 +111,21 @@ export interface TutorialLevel {
   rewards: Record<ResourceId, number>
 }
 
+export interface TaskTemplate {
+  id: string
+  name: string
+  description: string
+  category: 'recruit' | 'daily' | 'pve' | 'resource'
+  eventId: string
+  scope: 'lifetime' | 'daily'
+  goal: number
+  rewards: {
+    gold: number
+    crystal: number
+    xp: number
+  }
+}
+
 export interface GameContent {
   battlefield: {
     rows: number
@@ -122,6 +137,7 @@ export interface GameContent {
   buildings: BuildingTemplate[]
   spells: SpellTemplate[]
   tutorialLevels: TutorialLevel[]
+  tasks: TaskTemplate[]
 }
 
 export interface BuildingSaveState {
@@ -138,4 +154,8 @@ export interface SaveGame {
   activeSpellId: string
   completedLevelIds: string[]
   formation: FormationPlacement[]
+  taskEvents: Record<string, number>
+  dailyTaskEvents: Record<string, number>
+  dailyTaskDate: string
+  claimedTaskKeys: string[]
 }

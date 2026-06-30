@@ -7,10 +7,12 @@ import type {
   FormationPlacement,
   ResourceId,
   SaveGame,
+  TaskTemplate,
   UnitTemplate,
 } from '@shared/game'
 
 const saveKey = 'little-empire-save-v1'
+const todayKey = () => new Date().toISOString().slice(0, 10)
 
 const initialSave: SaveGame = {
   wallets: {
@@ -48,6 +50,10 @@ const initialSave: SaveGame = {
   activeLevelId: 'tutorial-1',
   activeSpellId: 'fire_blast',
   completedLevelIds: [],
+  taskEvents: {},
+  dailyTaskEvents: {},
+  dailyTaskDate: todayKey(),
+  claimedTaskKeys: [],
   formation: [
     { unitId: 'behemoth', row: 2, col: 1, level: 1 },
     { unitId: 'footman', row: 1, col: 3, level: 1 },
@@ -59,6 +65,42 @@ const initialSave: SaveGame = {
 }
 
 const defaultRoster = initialSave.roster
+
+const levelUpFromXp = (level: number, xp: number) => {
+  let nextLevel = level
+  let nextXp = xp
+
+  while (nextXp >= xpToNextLevel(nextLevel)) {
+    nextXp -= xpToNextLevel(nextLevel)
+    nextLevel += 1
+  }
+
+  return { level: nextLevel, xp: nextXp }
+}
+
+const withTaskEvent = (save: SaveGame, eventId: string, amount = 1): SaveGame => {
+  const nextDailyTaskDate = save.dailyTaskDate === todayKey() ? save.dailyTaskDate : todayKey()
+  const nextDailyTaskEvents = nextDailyTaskDate === save.dailyTaskDate ? save.dailyTaskEvents : {}
+
+  return {
+    ...save,
+    taskEvents: {
+      ...save.taskEvents,
+      [eventId]: (save.taskEvents[eventId] ?? 0) + amount,
+    },
+    dailyTaskDate: nextDailyTaskDate,
+    dailyTaskEvents: {
+      ...nextDailyTaskEvents,
+      [eventId]: (nextDailyTaskEvents[eventId] ?? 0) + amount,
+    },
+  }
+}
+
+const getTaskClaimKey = (task: TaskTemplate, save: SaveGame) =>
+  task.scope === 'daily' ? `${task.id}:${save.dailyTaskDate}` : task.id
+
+const getTaskProgress = (task: TaskTemplate, save: SaveGame) =>
+  task.scope === 'daily' ? save.dailyTaskEvents[task.eventId] ?? 0 : save.taskEvents[task.eventId] ?? 0
 
 const normalizeSave = (save: Partial<SaveGame> | null | undefined): SaveGame => ({
   wallets: {
@@ -79,19 +121,37 @@ const normalizeSave = (save: Partial<SaveGame> | null | undefined): SaveGame => 
   activeSpellId: save?.activeSpellId ?? initialSave.activeSpellId,
   completedLevelIds: save?.completedLevelIds ?? [],
   formation: save?.formation ?? initialSave.formation,
+  taskEvents: save?.taskEvents ?? {},
+  dailyTaskEvents: save?.dailyTaskEvents ?? {},
+  dailyTaskDate: save?.dailyTaskDate ?? todayKey(),
+  claimedTaskKeys: save?.claimedTaskKeys ?? [],
 })
+
+const refreshDailyState = (save: SaveGame): SaveGame => {
+  const currentDay = todayKey()
+
+  if (save.dailyTaskDate === currentDay) {
+    return save
+  }
+
+  return {
+    ...save,
+    dailyTaskDate: currentDay,
+    dailyTaskEvents: {},
+  }
+}
 
 const getStoredSave = (): SaveGame => {
   const raw = localStorage.getItem(saveKey)
 
   if (!raw) {
-    return initialSave
+    return refreshDailyState(initialSave)
   }
 
   try {
-    return normalizeSave(JSON.parse(raw) as Partial<SaveGame>)
+    return refreshDailyState(normalizeSave(JSON.parse(raw) as Partial<SaveGame>))
   } catch {
-    return initialSave
+    return refreshDailyState(initialSave)
   }
 }
 
@@ -148,6 +208,22 @@ function App() {
     () => gameContent.tutorialLevels.findIndex((level) => level.id === tutorialLevel.id),
     [tutorialLevel.id],
   )
+  const tasks = useMemo(
+    () =>
+      gameContent.tasks.map((task) => {
+        const progress = Math.min(task.goal, getTaskProgress(task, save))
+        const claimKey = getTaskClaimKey(task, save)
+        const claimed = save.claimedTaskKeys.includes(claimKey)
+
+        return {
+          ...task,
+          progress,
+          claimed,
+          canClaim: progress >= task.goal && !claimed,
+        }
+      }),
+    [save],
+  )
 
   const attackerArmy = useMemo(() => ({ placements: save.formation }), [save.formation])
   const placementCounts = useMemo(() => countPlacedUnits(save.formation), [save.formation])
@@ -155,6 +231,7 @@ function App() {
   const populationCap = getPopulationCap()
   const attackerValidation = validateArmy(attackerArmy, 'A')
   const nextLevelXp = xpToNextLevel(save.playerLevel)
+  const claimableTaskCount = tasks.filter((task) => task.canClaim).length
 
   const recruitUnit = (unit: UnitTemplate) => {
     if (!unit.recruitment) {
@@ -178,7 +255,7 @@ function App() {
 
     setError('')
     setSave((current) => ({
-      ...current,
+      ...withTaskEvent(current, 'recruit_unit'),
       wallets: {
         gold: current.wallets.gold - unit.recruitment!.gold,
         crystal: current.wallets.crystal - unit.recruitment!.crystal,
@@ -198,7 +275,7 @@ function App() {
     }
 
     setSave((current) => ({
-      ...current,
+      ...withTaskEvent(current, 'collect_resource'),
       wallets: {
         ...current.wallets,
         [resourceId]: current.wallets[resourceId] + amount,
@@ -210,6 +287,34 @@ function App() {
         },
       },
     }))
+  }
+
+  const claimTask = (task: TaskTemplate) => {
+    setSave((current) => {
+      const refreshed = refreshDailyState(current)
+      const claimKey = getTaskClaimKey(task, refreshed)
+
+      if (refreshed.claimedTaskKeys.includes(claimKey)) {
+        return refreshed
+      }
+
+      if (getTaskProgress(task, refreshed) < task.goal) {
+        return refreshed
+      }
+
+      const levelState = levelUpFromXp(refreshed.playerLevel, refreshed.xp + task.rewards.xp)
+
+      return {
+        ...refreshed,
+        wallets: {
+          gold: refreshed.wallets.gold + task.rewards.gold,
+          crystal: refreshed.wallets.crystal + task.rewards.crystal,
+        },
+        playerLevel: levelState.level,
+        xp: levelState.xp,
+        claimedTaskKeys: [...refreshed.claimedTaskKeys, claimKey],
+      }
+    })
   }
 
   const removePlacement = (row: number, col: number) => {
@@ -285,14 +390,9 @@ function App() {
       const nextCompletedLevelIds = current.completedLevelIds.includes(tutorialLevel.id)
         ? current.completedLevelIds
         : [...current.completedLevelIds, tutorialLevel.id]
-      let nextXp = current.xp + 50 + activeLevelIndex * 25
-      let nextPlayerLevel = current.playerLevel
+      const nextBaseXp = current.xp + 50 + activeLevelIndex * 25
+      const nextLevelState = levelUpFromXp(current.playerLevel, nextBaseXp)
       let nextRoster = current.roster
-
-      while (nextXp >= xpToNextLevel(nextPlayerLevel)) {
-        nextXp -= xpToNextLevel(nextPlayerLevel)
-        nextPlayerLevel += 1
-      }
 
       const nextTutorialLevel = gameContent.tutorialLevels[activeLevelIndex + 1]
       if (tutorialLevel.id === 'tutorial-4') {
@@ -303,15 +403,17 @@ function App() {
         }
       }
 
+      const progressed = withTaskEvent(current, 'win_pve')
+
       return {
-        ...current,
+        ...progressed,
         wallets: {
           gold: current.wallets.gold + tutorialLevel.rewards.gold,
           crystal: current.wallets.crystal + tutorialLevel.rewards.crystal,
         },
         roster: nextRoster,
-        playerLevel: nextPlayerLevel,
-        xp: nextXp,
+        playerLevel: nextLevelState.level,
+        xp: nextLevelState.xp,
         completedLevelIds: nextCompletedLevelIds,
         activeLevelId: nextTutorialLevel && !current.completedLevelIds.includes(tutorialLevel.id) ? nextTutorialLevel.id : current.activeLevelId,
       }
@@ -363,13 +465,17 @@ function App() {
           <span>下一级所需经验</span>
           <strong>{nextLevelXp}</strong>
         </div>
-        <div>
-          <span>当前关卡奖励</span>
-          <strong>
-            {tutorialLevel.rewards.gold}G / {tutorialLevel.rewards.crystal}C
-          </strong>
-        </div>
-      </section>
+          <div>
+            <span>当前关卡奖励</span>
+            <strong>
+              {tutorialLevel.rewards.gold}G / {tutorialLevel.rewards.crystal}C
+            </strong>
+          </div>
+          <div>
+            <span>可领奖任务</span>
+            <strong>{claimableTaskCount}</strong>
+          </div>
+        </section>
 
       {error ? <p className="error-banner">{error}</p> : null}
 
@@ -422,6 +528,39 @@ function App() {
                   </button>
                 ) : (
                   <div className="hero-tag">初始英雄</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="panel-header">
+            <h2>任务面板</h2>
+            <p>任务进度由行为事件实时累计。每日任务按自然日重置，不会回扫整个存档。</p>
+          </div>
+          <div className="task-list">
+            {tasks.map((task) => (
+              <div key={task.id} className={getCardClassName(task.canClaim)}>
+                <div className="task-header-row">
+                  <strong>{task.name}</strong>
+                  <span>{task.scope === 'daily' ? '每日' : '常驻'}</span>
+                </div>
+                <p className="task-copy">{task.description}</p>
+                <div className="meta-row">
+                  <span>
+                    进度 {task.progress}/{task.goal}
+                  </span>
+                  <span>
+                    奖励 {task.rewards.gold}G / {task.rewards.crystal}C / {task.rewards.xp}XP
+                  </span>
+                </div>
+                {task.claimed ? (
+                  <div className="hero-tag">已领取</div>
+                ) : (
+                  <button type="button" className="action-button" disabled={!task.canClaim} onClick={() => claimTask(task)}>
+                    {task.canClaim ? '领取奖励' : '未完成'}
+                  </button>
                 )}
               </div>
             ))}

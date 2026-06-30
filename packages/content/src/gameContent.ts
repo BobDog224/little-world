@@ -2,6 +2,7 @@ import type {
   BuildingTemplate,
   GameContent,
   SpellTemplate,
+  TaskTemplate,
   UnitLevelStats,
   UnitTemplate,
 } from '../../shared/src/game'
@@ -322,6 +323,69 @@ const buildings: BuildingTemplate[] = [
   },
 ]
 
+const tasks: TaskTemplate[] = [
+  {
+    id: 'recruit-starter-squad',
+    name: '招募预备队',
+    description: '累计招募 3 个基础单位，补齐开荒库存。',
+    category: 'recruit',
+    eventId: 'recruit_unit',
+    scope: 'lifetime',
+    goal: 3,
+    rewards: { gold: 180, crystal: 30, xp: 40 },
+  },
+  {
+    id: 'collect-economy-cycle',
+    name: '城市收成',
+    description: '累计收取 4 次资源，完成最小经济循环。',
+    category: 'resource',
+    eventId: 'collect_resource',
+    scope: 'lifetime',
+    goal: 4,
+    rewards: { gold: 220, crystal: 45, xp: 35 },
+  },
+  {
+    id: 'pve-secure-frontier',
+    name: '冒险推进',
+    description: '累计赢下 2 场教学战，解锁更多阵容空间。',
+    category: 'pve',
+    eventId: 'win_pve',
+    scope: 'lifetime',
+    goal: 2,
+    rewards: { gold: 260, crystal: 60, xp: 70 },
+  },
+  {
+    id: 'daily-harvest',
+    name: '每日收菜',
+    description: '今日完成 2 次资源收取。',
+    category: 'daily',
+    eventId: 'collect_resource',
+    scope: 'daily',
+    goal: 2,
+    rewards: { gold: 100, crystal: 20, xp: 20 },
+  },
+  {
+    id: 'daily-recruit',
+    name: '每日征兵',
+    description: '今日完成 1 次招募。',
+    category: 'daily',
+    eventId: 'recruit_unit',
+    scope: 'daily',
+    goal: 1,
+    rewards: { gold: 120, crystal: 25, xp: 20 },
+  },
+  {
+    id: 'daily-pve',
+    name: '每日出征',
+    description: '今日赢下 1 场教学战。',
+    category: 'daily',
+    eventId: 'win_pve',
+    scope: 'daily',
+    goal: 1,
+    rewards: { gold: 140, crystal: 30, xp: 25 },
+  },
+]
+
 export const gameContent: GameContent = {
   battlefield: {
     rows: 6,
@@ -332,6 +396,7 @@ export const gameContent: GameContent = {
   units: [...heroes, ...units],
   buildings,
   spells,
+  tasks,
   tutorialLevels: [
     {
       id: 'tutorial-1',

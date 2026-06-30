@@ -51,7 +51,7 @@
 
 .progress-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
   margin-top: 16px;
 }
@@ -155,6 +155,7 @@
 
 .resource-grid,
 .roster-grid,
+.task-list,
 .spell-picker,
 .result-summary {
   display: grid;
@@ -168,6 +169,11 @@
 
 .roster-grid {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-top: 16px;
+}
+
+.task-list {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   margin-top: 16px;
 }
 
@@ -255,6 +261,24 @@
   background: rgba(240, 187, 97, 0.16);
 }
 
+.task-header-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.task-header-row span {
+  color: #b59d7f;
+  font-size: 12px;
+}
+
+.task-copy {
+  margin: 10px 0 12px;
+  color: #d2bea0;
+  line-height: 1.6;
+}
+
 .battlefield-frame {
   overflow-x: auto;
   margin-top: 14px;
@@ -320,6 +344,11 @@
 .spell-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .result-summary {
