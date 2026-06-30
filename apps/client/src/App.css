@@ -156,6 +156,8 @@
 .resource-grid,
 .roster-grid,
 .task-list,
+.save-actions,
+.save-meta-grid,
 .spell-picker,
 .result-summary {
   display: grid;
@@ -163,7 +165,8 @@
 }
 
 .resource-grid,
-.result-summary {
+.result-summary,
+.save-meta-grid {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
@@ -174,6 +177,11 @@
 
 .task-list {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-top: 16px;
+}
+
+.save-actions {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   margin-top: 16px;
 }
 
@@ -254,6 +262,10 @@
   background: #7f4c20;
 }
 
+.danger-button {
+  background: #8e3927;
+}
+
 .hero-tag {
   padding: 12px 14px;
   border-radius: 14px;
@@ -277,6 +289,28 @@
   margin: 10px 0 12px;
   color: #d2bea0;
   line-height: 1.6;
+}
+
+.save-meta-grid {
+  margin-top: 16px;
+}
+
+.save-meta-grid div {
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 216, 154, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.save-meta-grid strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 18px;
+  word-break: break-word;
+}
+
+.hidden-input {
+  display: none;
 }
 
 .battlefield-frame {

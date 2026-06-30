@@ -145,6 +145,8 @@ export interface BuildingSaveState {
 }
 
 export interface SaveGame {
+  schemaVersion: number
+  contentVersion: string
   wallets: Record<ResourceId, number>
   buildings: Record<string, BuildingSaveState>
   roster: Record<string, number>

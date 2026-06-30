@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import './App.css'
 import { buildingById, gameContent, spellById, unitById } from '@content/gameContent'
 import { getArmyPopulation, simulateBattle, validateArmy } from '@sim/battle'
@@ -12,9 +12,14 @@ import type {
 } from '@shared/game'
 
 const saveKey = 'little-empire-save-v1'
+const saveSchemaVersion = 2
+const contentVersion = 'mvp-0.3.0'
+const maxImportSizeBytes = 256 * 1024
 const todayKey = () => new Date().toISOString().slice(0, 10)
 
-const initialSave: SaveGame = {
+const createInitialSave = (): SaveGame => ({
+  schemaVersion: saveSchemaVersion,
+  contentVersion,
   wallets: {
     gold: 2200,
     crystal: 700,
@@ -62,7 +67,9 @@ const initialSave: SaveGame = {
     { unitId: 'archer', row: 4, col: 5, level: 1 },
     { unitId: 'priest', row: 3, col: 4, level: 1 },
   ],
-}
+})
+
+const initialSave = createInitialSave()
 
 const defaultRoster = initialSave.roster
 
@@ -103,6 +110,8 @@ const getTaskProgress = (task: TaskTemplate, save: SaveGame) =>
   task.scope === 'daily' ? save.dailyTaskEvents[task.eventId] ?? 0 : save.taskEvents[task.eventId] ?? 0
 
 const normalizeSave = (save: Partial<SaveGame> | null | undefined): SaveGame => ({
+  schemaVersion: saveSchemaVersion,
+  contentVersion,
   wallets: {
     ...initialSave.wallets,
     ...save?.wallets,
@@ -126,6 +135,20 @@ const normalizeSave = (save: Partial<SaveGame> | null | undefined): SaveGame => 
   dailyTaskDate: save?.dailyTaskDate ?? todayKey(),
   claimedTaskKeys: save?.claimedTaskKeys ?? [],
 })
+
+const parseImportedSave = (raw: string): SaveGame => {
+  if (new Blob([raw]).size > maxImportSizeBytes) {
+    throw new Error('导入失败：存档文件过大。')
+  }
+
+  const parsed = JSON.parse(raw)
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('导入失败：存档不是有效对象。')
+  }
+
+  return refreshDailyState(normalizeSave(parsed as Partial<SaveGame>))
+}
 
 const refreshDailyState = (save: SaveGame): SaveGame => {
   const currentDay = todayKey()
@@ -195,6 +218,8 @@ function App() {
   const [selectedUnitId, setSelectedUnitId] = useState('footman')
   const [battleResult, setBattleResult] = useState<BattleResult | null>(null)
   const [error, setError] = useState('')
+  const [saveMessage, setSaveMessage] = useState('')
+  const importInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     localStorage.setItem(saveKey, JSON.stringify(save))
@@ -232,6 +257,53 @@ function App() {
   const attackerValidation = validateArmy(attackerArmy, 'A')
   const nextLevelXp = xpToNextLevel(save.playerLevel)
   const claimableTaskCount = tasks.filter((task) => task.canClaim).length
+
+  const exportSave = () => {
+    const exportPayload = JSON.stringify(refreshDailyState(save), null, 2)
+    const blob = new Blob([exportPayload], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = `little-empire-save-${todayKey()}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    setSaveMessage('已导出当前本地存档。')
+  }
+
+  const importSave = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+
+    if (!file) {
+      return
+    }
+
+    try {
+      const imported = parseImportedSave(await file.text())
+      setSave(imported)
+      setBattleResult(null)
+      setError('')
+      setSaveMessage(`已导入存档，内容版本 ${imported.contentVersion}。`)
+    } catch (importError) {
+      setSaveMessage(importError instanceof Error ? importError.message : '导入失败：未知错误。')
+    } finally {
+      event.target.value = ''
+    }
+  }
+
+  const resetSave = () => {
+    const confirmed = window.confirm('确认重置本地存档？当前进度会被新的初始存档覆盖。')
+
+    if (!confirmed) {
+      return
+    }
+
+    const freshSave = refreshDailyState(createInitialSave())
+    setSave(freshSave)
+    setBattleResult(null)
+    setError('')
+    setSaveMessage('已重置为新的初始存档。')
+  }
 
   const recruitUnit = (unit: UnitTemplate) => {
     if (!unit.recruitment) {
@@ -478,8 +550,46 @@ function App() {
         </section>
 
       {error ? <p className="error-banner">{error}</p> : null}
+      {saveMessage ? <p className="empty-state">{saveMessage}</p> : null}
 
       <section className="layout-grid">
+        <article className="panel">
+          <div className="panel-header">
+            <h2>存档与版本</h2>
+            <p>支持本地 JSON 导入导出，并显示当前存档 schema 与内容版本。</p>
+          </div>
+          <div className="save-actions">
+            <button type="button" className="action-button" onClick={exportSave}>
+              导出存档
+            </button>
+            <button type="button" className="action-button" onClick={() => importInputRef.current?.click()}>
+              导入存档
+            </button>
+            <button type="button" className="action-button danger-button" onClick={resetSave}>
+              重置存档
+            </button>
+            <input ref={importInputRef} className="hidden-input" type="file" accept="application/json,.json" onChange={importSave} />
+          </div>
+          <div className="save-meta-grid">
+            <div>
+              <span>Schema</span>
+              <strong>{save.schemaVersion}</strong>
+            </div>
+            <div>
+              <span>内容版本</span>
+              <strong>{save.contentVersion}</strong>
+            </div>
+            <div>
+              <span>存档键</span>
+              <strong>{saveKey}</strong>
+            </div>
+            <div>
+              <span>导入限制</span>
+              <strong>{Math.floor(maxImportSizeBytes / 1024)} KB</strong>
+            </div>
+          </div>
+        </article>
+
         <article className="panel">
           <div className="panel-header">
             <h2>城市资源</h2>
