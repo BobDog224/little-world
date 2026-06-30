@@ -142,6 +142,8 @@ export interface GameContent {
 
 export interface BuildingSaveState {
   lastCollectedAt: string
+  row: number
+  col: number
 }
 
 export interface SaveGame {

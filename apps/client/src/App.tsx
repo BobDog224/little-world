@@ -4,6 +4,7 @@ import { buildingById, gameContent, spellById, unitById } from '@content/gameCon
 import { getArmyPopulation, simulateBattle, validateArmy } from '@sim/battle'
 import type {
   BattleResult,
+  BuildingSaveState,
   FormationPlacement,
   ResourceId,
   SaveGame,
@@ -13,9 +14,40 @@ import type {
 
 const saveKey = 'little-empire-save-v1'
 const saveSchemaVersion = 2
-const contentVersion = 'mvp-0.3.0'
+const contentVersion = 'mvp-0.4.0'
 const maxImportSizeBytes = 256 * 1024
 const todayKey = () => new Date().toISOString().slice(0, 10)
+const cityRows = 16
+const cityColumns = 16
+
+type DragState =
+  | { type: 'building'; buildingId: string }
+  | { type: 'roster-unit'; unitId: string }
+  | { type: 'placed-unit'; placementIndex: number; unitId: string }
+
+interface ReplayEntityState {
+  entityId: string
+  unitId: string
+  name: string
+  side: 'A' | 'B'
+  row: number
+  col: number
+  width: number
+  height: number
+  hp: number
+  maxHp: number
+  alive: boolean
+}
+
+const initialBuildingLayout: Record<string, Pick<BuildingSaveState, 'row' | 'col'>> = {
+  castle: { row: 3, col: 3 },
+  house: { row: 0, col: 0 },
+  gold_mine: { row: 0, col: 3 },
+  crystal_mine: { row: 0, col: 8 },
+  barracks: { row: 11, col: 0 },
+  shooting_range: { row: 11, col: 5 },
+  warehouse: { row: 11, col: 10 },
+}
 
 const createInitialSave = (): SaveGame => ({
   schemaVersion: saveSchemaVersion,
@@ -25,13 +57,13 @@ const createInitialSave = (): SaveGame => ({
     crystal: 700,
   },
   buildings: {
-    castle: { lastCollectedAt: new Date().toISOString() },
-    house: { lastCollectedAt: new Date().toISOString() },
-    gold_mine: { lastCollectedAt: new Date(Date.now() - 1000 * 60 * 70).toISOString() },
-    crystal_mine: { lastCollectedAt: new Date(Date.now() - 1000 * 60 * 90).toISOString() },
-    barracks: { lastCollectedAt: new Date().toISOString() },
-    shooting_range: { lastCollectedAt: new Date().toISOString() },
-    warehouse: { lastCollectedAt: new Date().toISOString() },
+    castle: { lastCollectedAt: new Date().toISOString(), ...initialBuildingLayout.castle },
+    house: { lastCollectedAt: new Date().toISOString(), ...initialBuildingLayout.house },
+    gold_mine: { lastCollectedAt: new Date(Date.now() - 1000 * 60 * 70).toISOString(), ...initialBuildingLayout.gold_mine },
+    crystal_mine: { lastCollectedAt: new Date(Date.now() - 1000 * 60 * 90).toISOString(), ...initialBuildingLayout.crystal_mine },
+    barracks: { lastCollectedAt: new Date().toISOString(), ...initialBuildingLayout.barracks },
+    shooting_range: { lastCollectedAt: new Date().toISOString(), ...initialBuildingLayout.shooting_range },
+    warehouse: { lastCollectedAt: new Date().toISOString(), ...initialBuildingLayout.warehouse },
   },
   roster: {
     behemoth: 1,
@@ -109,6 +141,17 @@ const getTaskClaimKey = (task: TaskTemplate, save: SaveGame) =>
 const getTaskProgress = (task: TaskTemplate, save: SaveGame) =>
   task.scope === 'daily' ? save.dailyTaskEvents[task.eventId] ?? 0 : save.taskEvents[task.eventId] ?? 0
 
+const normalizeBuildings = (buildings: Partial<SaveGame['buildings']> | null | undefined) =>
+  Object.fromEntries(
+    Object.entries(initialSave.buildings).map(([buildingId, state]) => [
+      buildingId,
+      {
+        ...state,
+        ...(buildings?.[buildingId] ?? {}),
+      },
+    ]),
+  ) as SaveGame['buildings']
+
 const normalizeSave = (save: Partial<SaveGame> | null | undefined): SaveGame => ({
   schemaVersion: saveSchemaVersion,
   contentVersion,
@@ -116,10 +159,7 @@ const normalizeSave = (save: Partial<SaveGame> | null | undefined): SaveGame => 
     ...initialSave.wallets,
     ...save?.wallets,
   },
-  buildings: {
-    ...initialSave.buildings,
-    ...save?.buildings,
-  },
+  buildings: normalizeBuildings(save?.buildings),
   roster: {
     ...defaultRoster,
     ...save?.roster,
@@ -190,6 +230,69 @@ const countPlacedUnits = (formation: FormationPlacement[]) => {
   return counts
 }
 
+const getUnitStats = (unitId: string, level: number) => {
+  const template = unitById[unitId]
+  const index = Math.max(0, Math.min(template.levels.length - 1, level - 1))
+
+  return template.levels[index]
+}
+
+const buildReplayEntities = (formation: FormationPlacement[], defender: FormationPlacement[]) => {
+  const entries: ReplayEntityState[] = []
+
+  for (const [side, placements] of [
+    ['A', formation],
+    ['B', defender],
+  ] as const) {
+    placements.forEach((placement, index) => {
+      const template = unitById[placement.unitId]
+      const stats = getUnitStats(placement.unitId, placement.level)
+
+      entries.push({
+        entityId: `${side}-${placement.unitId}-${index + 1}`,
+        unitId: placement.unitId,
+        name: template.name,
+        side,
+        row: placement.row,
+        col: placement.col,
+        width: template.footprint.width,
+        height: template.footprint.height,
+        hp: stats.hp,
+        maxHp: stats.hp,
+        alive: true,
+      })
+    })
+  }
+
+  return entries
+}
+
+const getPlacementAtCell = (formation: FormationPlacement[], row: number, col: number) =>
+  formation.find((item) => {
+    const template = unitById[item.unitId]
+    return row >= item.row && row < item.row + template.footprint.height && col >= item.col && col < item.col + template.footprint.width
+  })
+
+const canPlaceBuilding = (buildingId: string, row: number, col: number, buildings: SaveGame['buildings']) => {
+  const template = buildingById[buildingId]
+
+  if (row < 0 || col < 0 || row + template.size.height > cityRows || col + template.size.width > cityColumns) {
+    return false
+  }
+
+  return !Object.entries(buildings).some(([otherId, state]) => {
+    if (otherId === buildingId) {
+      return false
+    }
+
+    const other = buildingById[otherId]
+    const overlapsRows = row < state.row + other.size.height && row + template.size.height > state.row
+    const overlapsCols = col < state.col + other.size.width && col + template.size.width > state.col
+
+    return overlapsRows && overlapsCols
+  })
+}
+
 const getPopulationCap = () => {
   const castleBonus = buildingById.castle.economy?.populationBonus ?? 0
   const houseBonus = buildingById.house.economy?.populationBonus ?? 0
@@ -219,6 +322,11 @@ function App() {
   const [battleResult, setBattleResult] = useState<BattleResult | null>(null)
   const [error, setError] = useState('')
   const [saveMessage, setSaveMessage] = useState('')
+  const [dragState, setDragState] = useState<DragState | null>(null)
+  const [replayEntities, setReplayEntities] = useState<ReplayEntityState[]>([])
+  const [replayTick, setReplayTick] = useState(0)
+  const [replayPlaying, setReplayPlaying] = useState(false)
+  const [replayHighlights, setReplayHighlights] = useState<{ attackers: string[]; targets: string[] }>({ attackers: [], targets: [] })
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -257,6 +365,76 @@ function App() {
   const attackerValidation = validateArmy(attackerArmy, 'A')
   const nextLevelXp = xpToNextLevel(save.playerLevel)
   const claimableTaskCount = tasks.filter((task) => task.canClaim).length
+  const replaySourcePlacements = useMemo(() => buildReplayEntities(save.formation, tutorialLevel.defender.placements), [save.formation, tutorialLevel.defender.placements])
+
+  useEffect(() => {
+    if (!battleResult) {
+      return
+    }
+
+    setReplayEntities(replaySourcePlacements)
+    setReplayTick(0)
+    setReplayPlaying(true)
+    setReplayHighlights({ attackers: [], targets: [] })
+  }, [battleResult, replaySourcePlacements])
+
+  useEffect(() => {
+    if (!battleResult || !replayPlaying) {
+      return
+    }
+
+    if (replayTick > battleResult.endTick) {
+      setReplayPlaying(false)
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      const tickEvents = battleResult.events.filter((event) => event.tick === replayTick)
+
+      setReplayHighlights({
+        attackers: tickEvents.map((event) => event.sourceId).filter(Boolean) as string[],
+        targets: tickEvents.map((event) => event.targetId).filter(Boolean) as string[],
+      })
+
+      if (tickEvents.length > 0) {
+        setReplayEntities((current) => {
+          const next = current.map((entity) => ({ ...entity }))
+
+          for (const event of tickEvents) {
+            const source = next.find((entity) => entity.entityId === event.sourceId)
+            const target = next.find((entity) => entity.entityId === event.targetId)
+
+            if (event.type === 'move' && source) {
+              source.col += source.side === 'A' ? 1 : -1
+            }
+
+            if ((event.type === 'attack' || event.type === 'spell') && target && typeof event.value === 'number') {
+              if (event.type === 'spell' && event.note?.includes('治疗')) {
+                target.hp = Math.min(target.maxHp, target.hp + event.value)
+              } else {
+                target.hp = Math.max(0, target.hp - event.value)
+              }
+            }
+
+            if (event.type === 'heal' && target && typeof event.value === 'number') {
+              target.hp = Math.min(target.maxHp, target.hp + event.value)
+            }
+
+            if (event.type === 'death' && target) {
+              target.hp = 0
+              target.alive = false
+            }
+          }
+
+          return next
+        })
+      }
+
+      setReplayTick((current) => current + 1)
+    }, 140)
+
+    return () => window.clearTimeout(timer)
+  }, [battleResult, replayPlaying, replayTick])
 
   const exportSave = () => {
     const exportPayload = JSON.stringify(refreshDailyState(save), null, 2)
@@ -355,6 +533,7 @@ function App() {
       buildings: {
         ...current.buildings,
         [buildingId]: {
+          ...current.buildings[buildingId],
           lastCollectedAt: new Date().toISOString(),
         },
       },
@@ -402,18 +581,90 @@ function App() {
     }))
   }
 
-  const placeUnit = (row: number, col: number) => {
+  const moveBuilding = (buildingId: string, row: number, col: number) => {
+    if (!canPlaceBuilding(buildingId, row, col, save.buildings)) {
+      setError('建筑不能放在这里：越界或与其他建筑重叠。')
+      return
+    }
+
+    setError('')
+    setSave((current) => ({
+      ...current,
+      buildings: {
+        ...current.buildings,
+        [buildingId]: {
+          ...current.buildings[buildingId],
+          row,
+          col,
+        },
+      },
+    }))
+  }
+
+  const moveExistingPlacement = (placementIndex: number, row: number, col: number) => {
+    const currentPlacement = save.formation[placementIndex]
+
+    if (!currentPlacement) {
+      return
+    }
+
+    const remaining = save.formation.filter((_, index) => index !== placementIndex)
+    const nextPlacement: FormationPlacement = { ...currentPlacement, row, col }
+    const nextArmy = { placements: [...remaining, nextPlacement] }
+    const validation = validateArmy(nextArmy, 'A')
+
+    if (!validation.ok) {
+      setError(validation.reason)
+      return
+    }
+
+    setError('')
+    setSave((current) => ({
+      ...current,
+      formation: current.formation.map((placement, index) => (index === placementIndex ? nextPlacement : placement)),
+    }))
+  }
+
+  const handleBattlefieldDrop = (row: number, col: number) => {
+    if (!dragState) {
+      return
+    }
+
+    if (col > 6) {
+      setError('只能拖放到我方部署区。')
+      return
+    }
+
+    if (dragState.type === 'roster-unit') {
+      setSelectedUnitId(dragState.unitId)
+      placeUnit(row, col, dragState.unitId)
+      return
+    }
+
+    if (dragState.type === 'placed-unit') {
+      moveExistingPlacement(dragState.placementIndex, row, col)
+    }
+  }
+
+  const restartReplay = () => {
+    setReplayEntities(replaySourcePlacements)
+    setReplayTick(0)
+    setReplayPlaying(true)
+    setReplayHighlights({ attackers: [], targets: [] })
+  }
+
+  const placeUnit = (row: number, col: number, unitId = selectedUnitId) => {
     setError('')
 
-    const placedCount = placementCounts[selectedUnitId] ?? 0
-    const ownedCount = save.roster[selectedUnitId] ?? 0
+    const placedCount = placementCounts[unitId] ?? 0
+    const ownedCount = save.roster[unitId] ?? 0
 
     if (placedCount >= ownedCount) {
       setError('该单位库存不足，请先招募或移除其他已部署实例。')
       return
     }
 
-    const nextPlacement: FormationPlacement = { unitId: selectedUnitId, row, col, level: 1 }
+    const nextPlacement: FormationPlacement = { unitId, row, col, level: 1 }
     const nextArmy = { placements: [...save.formation, nextPlacement] }
 
     if (getArmyPopulation(nextArmy) > populationCap) {
@@ -590,6 +841,74 @@ function App() {
           </div>
         </article>
 
+        <article className="panel wide-panel">
+          <div className="panel-header">
+            <h2>城市建造网格</h2>
+            <p>从下方建筑卡片拖到城市网格，可直接重排建筑布局。</p>
+          </div>
+          <div className="building-palette">
+            {gameContent.buildings.map((building) => (
+              <button
+                key={building.id}
+                type="button"
+                className="building-chip"
+                draggable
+                onDragStart={() => setDragState({ type: 'building', buildingId: building.id })}
+                onDragEnd={() => setDragState(null)}
+              >
+                <strong>{building.name}</strong>
+                <small>
+                  {building.size.width}x{building.size.height}
+                </small>
+              </button>
+            ))}
+          </div>
+          <div className="city-grid-frame">
+            <div className="city-grid">
+              {Array.from({ length: cityRows }).flatMap((_, row) =>
+                Array.from({ length: cityColumns }).map((__, col) => (
+                  <button
+                    key={`city-${row}-${col}`}
+                    type="button"
+                    className={`city-cell${dragState?.type === 'building' && canPlaceBuilding(dragState.buildingId, row, col, save.buildings) ? ' droppable' : ''}`}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault()
+
+                      if (dragState?.type === 'building') {
+                        moveBuilding(dragState.buildingId, row, col)
+                      }
+
+                      setDragState(null)
+                    }}
+                  />
+                )),
+              )}
+              {Object.entries(save.buildings).map(([buildingId, state]) => {
+                const building = buildingById[buildingId]
+
+                return (
+                  <button
+                    key={buildingId}
+                    type="button"
+                    className="city-building"
+                    draggable
+                    onDragStart={() => setDragState({ type: 'building', buildingId })}
+                    onDragEnd={() => setDragState(null)}
+                    style={{
+                      gridColumn: `${state.col + 1} / span ${building.size.width}`,
+                      gridRow: `${state.row + 1} / span ${building.size.height}`,
+                    }}
+                  >
+                    <strong>{building.name}</strong>
+                    <small>{building.category}</small>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </article>
+
         <article className="panel">
           <div className="panel-header">
             <h2>城市资源</h2>
@@ -623,7 +942,13 @@ function App() {
           </div>
           <div className="roster-grid">
             {gameContent.units.map((unit) => (
-              <div key={unit.id} className={getCardClassName(selectedUnitId === unit.id)}>
+              <div
+                key={unit.id}
+                className={getCardClassName(selectedUnitId === unit.id)}
+                draggable
+                onDragStart={() => setDragState({ type: 'roster-unit', unitId: unit.id })}
+                onDragEnd={() => setDragState(null)}
+              >
                 <button type="button" className="select-button" onClick={() => setSelectedUnitId(unit.id)}>
                   <span>{unit.name}</span>
                   <small>{unit.trait}</small>
@@ -680,28 +1005,41 @@ function App() {
         <article className="panel wide-panel">
           <div className="panel-header">
             <h2>6x15 阵型编辑</h2>
-            <p>左侧 0-6 列为我方部署区。点击空格放置当前选中单位，点击已占用格子移除单位。</p>
+            <p>左侧 0-6 列为我方部署区。可从库存拖拽上阵，也可拖动已部署单位调整位置。</p>
           </div>
           {!attackerValidation.ok ? <p className="warning-text">当前阵型: {attackerValidation.reason}</p> : null}
           <div className="battlefield-frame">
             <div className="battlefield-grid">
               {Array.from({ length: gameContent.battlefield.rows }).flatMap((_, row) =>
                 Array.from({ length: gameContent.battlefield.columns }).map((__, col) => {
-                  const placement = save.formation.find((item) => {
-                    const template = unitById[item.unitId]
-                    return row >= item.row && row < item.row + template.footprint.height && col >= item.col && col < item.col + template.footprint.width
-                  })
-                  const defender = tutorialLevel.defender.placements.find((item) => {
-                    const template = unitById[item.unitId]
-                    return row >= item.row && row < item.row + template.footprint.height && col >= item.col && col < item.col + template.footprint.width
-                  })
+                  const placement = getPlacementAtCell(save.formation, row, col)
+                  const placementIndex = placement ? save.formation.findIndex((item) => item === placement) : -1
+                  const defender = getPlacementAtCell(tutorialLevel.defender.placements, row, col)
                   const isNeutral = col === 7
+                  const isPlacementAnchor = placement ? placement.row === row && placement.col === col : false
 
                   return (
                     <button
                       key={`${row}-${col}`}
                       type="button"
+                      draggable={isPlacementAnchor}
                       className={`cell${placement ? ' attacker' : ''}${defender ? ' defender' : ''}${isNeutral ? ' neutral' : ''}`}
+                      onDragStart={() => {
+                        if (placement && placementIndex >= 0) {
+                          setDragState({ type: 'placed-unit', placementIndex, unitId: placement.unitId })
+                        }
+                      }}
+                      onDragEnd={() => setDragState(null)}
+                      onDragOver={(event) => {
+                        if (col <= 6) {
+                          event.preventDefault()
+                        }
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault()
+                        handleBattlefieldDrop(row, col)
+                        setDragState(null)
+                      }}
                       onClick={() => {
                         if (placement) {
                           removePlacement(row, col)
@@ -812,6 +1150,58 @@ function App() {
             </>
           ) : (
             <p className="empty-state">还没有战报。先完成部署，然后开始第一场教学战。</p>
+          )}
+        </article>
+
+        <article className="panel wide-panel">
+          <div className="panel-header">
+            <h2>战斗回放</h2>
+            <p>按事件重放推进、攻击、治疗与死亡，便于观察阵型和特效触发。</p>
+          </div>
+          {battleResult ? (
+            <>
+              <div className="replay-toolbar">
+                <button type="button" className="action-button" onClick={() => setReplayPlaying((current) => !current)}>
+                  {replayPlaying ? '暂停' : '继续'}
+                </button>
+                <button type="button" className="action-button" onClick={restartReplay}>
+                  重新播放
+                </button>
+                <div className="replay-tick">Tick {Math.min(replayTick, battleResult.endTick)}</div>
+              </div>
+              <div className="replay-field">
+                <div className="battlefield-grid replay-grid-base">
+                  {Array.from({ length: gameContent.battlefield.rows * gameContent.battlefield.columns }).map((_, index) => {
+                    const col = index % gameContent.battlefield.columns
+
+                    return <div key={`replay-${index}`} className={`cell replay-cell${col === 7 ? ' neutral' : ''}`} />
+                  })}
+                </div>
+                <div className="replay-overlay">
+                  {replayEntities.map((entity) => (
+                    <div
+                      key={entity.entityId}
+                      className={`replay-unit side-${entity.side.toLowerCase()}${entity.alive ? '' : ' dead'}${replayHighlights.attackers.includes(entity.entityId) ? ' acting' : ''}${replayHighlights.targets.includes(entity.entityId) ? ' impacted' : ''}`}
+                      style={{
+                        width: `${entity.width * 48 - 4}px`,
+                        height: `${entity.height * 48 - 4}px`,
+                        transform: `translate(${entity.col * 48}px, ${entity.row * 48}px)`,
+                      }}
+                    >
+                      <span>{entity.name}</span>
+                      <small>
+                        {Math.max(0, entity.hp)}/{entity.maxHp}
+                      </small>
+                      <div className="hp-bar">
+                        <div style={{ width: `${Math.max(0, (entity.hp / entity.maxHp) * 100)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="empty-state">开始一场战斗后，这里会自动播放部队推进和交战动画。</p>
           )}
         </article>
       </section>
