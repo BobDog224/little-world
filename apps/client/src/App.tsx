@@ -47,6 +47,15 @@ interface ReplayFx {
   tone: 'damage' | 'heal' | 'spell' | 'buff'
 }
 
+interface ReplayTrace {
+  id: string
+  x: number
+  y: number
+  width: number
+  angle: number
+  tone: 'projectile' | 'spell' | 'impact'
+}
+
 const initialBuildingLayout: Record<string, Pick<BuildingSaveState, 'row' | 'col'>> = {
   castle: { row: 3, col: 3 },
   house: { row: 0, col: 0 },
@@ -358,6 +367,7 @@ function App() {
   const [replayPlaying, setReplayPlaying] = useState(false)
   const [replayHighlights, setReplayHighlights] = useState<{ attackers: string[]; targets: string[] }>({ attackers: [], targets: [] })
   const [replayEffects, setReplayEffects] = useState<ReplayFx[]>([])
+  const [replayTraces, setReplayTraces] = useState<ReplayTrace[]>([])
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -410,6 +420,7 @@ function App() {
     setReplayPlaying(true)
     setReplayHighlights({ attackers: [], targets: [] })
     setReplayEffects([])
+    setReplayTraces([])
   }, [battleResult, replaySourcePlacements])
 
   useEffect(() => {
@@ -434,10 +445,29 @@ function App() {
         setReplayEntities((current) => {
           const next = current.map((entity) => ({ ...entity }))
           const nextEffects: ReplayFx[] = []
+          const nextTraces: ReplayTrace[] = []
 
           for (const event of tickEvents) {
             const source = next.find((entity) => entity.entityId === event.sourceId)
             const target = next.find((entity) => entity.entityId === event.targetId)
+
+            if (source && target && (event.type === 'attack' || event.type === 'spell')) {
+              const startX = source.col * 48 + source.width * 24
+              const startY = source.row * 48 + source.height * 24
+              const endX = target.col * 48 + target.width * 24
+              const endY = target.row * 48 + target.height * 24
+              const dx = endX - startX
+              const dy = endY - startY
+
+              nextTraces.push({
+                id: `${replayTick}-${event.type}-trace-${source.entityId}-${target.entityId}`,
+                x: startX,
+                y: startY,
+                width: Math.hypot(dx, dy),
+                angle: (Math.atan2(dy, dx) * 180) / Math.PI,
+                tone: event.type === 'spell' ? 'spell' : source.col === target.col || source.row === target.row ? 'impact' : 'projectile',
+              })
+            }
 
             if (target && typeof event.value === 'number' && (event.type === 'attack' || event.type === 'heal' || event.type === 'spell' || event.type === 'buff')) {
               nextEffects.push({
@@ -486,11 +516,13 @@ function App() {
           }
 
           setReplayEffects(nextEffects)
+          setReplayTraces(nextTraces)
 
           return next
         })
       } else {
         setReplayEffects([])
+        setReplayTraces([])
       }
 
       setReplayTick((current) => current + 1)
@@ -730,6 +762,7 @@ function App() {
     setReplayPlaying(true)
     setReplayHighlights({ attackers: [], targets: [] })
     setReplayEffects([])
+    setReplayTraces([])
   }
 
   const returnToFormation = () => {
@@ -739,6 +772,7 @@ function App() {
     setReplayPlaying(false)
     setReplayHighlights({ attackers: [], targets: [] })
     setReplayEffects([])
+    setReplayTraces([])
   }
 
   const placeUnit = (row: number, col: number, unitId = selectedUnitId) => {
@@ -1103,7 +1137,7 @@ function App() {
         <article className="panel wide-panel">
           <div className="panel-header">
             <h2>6x15 阵型编辑</h2>
-            <p>{showBattleStage ? '战斗开始后，这里会直接播放双方推进和交战动画。' : '左侧 0-6 列为我方部署区。可从库存拖拽上阵，也可拖动已部署单位调整位置。'}</p>
+            <p>{showBattleStage ? '战斗开始后，这里会直接播放双方推进、远程弹道、法术命中和交战动画。' : '左侧 0-6 列为我方部署区。可从库存拖拽上阵，也可拖动已部署单位调整位置。'}</p>
           </div>
           {!showBattleStage && !attackerValidation.ok ? <p className="warning-text">当前阵型: {attackerValidation.reason}</p> : null}
           {showBattleStage ? (
@@ -1149,6 +1183,16 @@ function App() {
                         <div style={{ width: `${Math.max(0, (entity.hp / entity.maxHp) * 100)}%` }} />
                       </div>
                     </div>
+                  ))}
+                  {replayTraces.map((trace) => (
+                    <div
+                      key={trace.id}
+                      className={`replay-trace ${trace.tone}`}
+                      style={{
+                        width: `${trace.width}px`,
+                        transform: `translate(${trace.x}px, ${trace.y}px) rotate(${trace.angle}deg)`,
+                      }}
+                    />
                   ))}
                   {replayEffects.map((effect) => (
                     <div key={effect.id} className={`replay-fx ${effect.tone}`} style={{ transform: `translate(${effect.x}px, ${effect.y}px)` }}>
