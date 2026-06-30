@@ -370,6 +370,11 @@
   border-color: rgba(103, 177, 111, 0.5);
 }
 
+.city-cell.blocked {
+  background: rgba(177, 87, 87, 0.18);
+  border-color: rgba(216, 109, 109, 0.5);
+}
+
 .city-building {
   z-index: 1;
   padding: 8px;
@@ -412,6 +417,16 @@
 
 .cell.neutral {
   border-color: rgba(255, 206, 132, 0.3);
+}
+
+.cell.drop-ok {
+  background: rgba(103, 177, 111, 0.3);
+  border-color: rgba(155, 230, 165, 0.7);
+}
+
+.cell.drop-bad {
+  background: rgba(177, 87, 87, 0.24);
+  border-color: rgba(229, 118, 118, 0.65);
 }
 
 .replay-toolbar {
@@ -482,6 +497,29 @@
   opacity: 0.2;
 }
 
+.replay-fx {
+  position: absolute;
+  font-size: 14px;
+  font-weight: 800;
+  animation: float-up 420ms ease-out forwards;
+}
+
+.replay-fx.damage {
+  color: #ff8a7a;
+}
+
+.replay-fx.heal {
+  color: #7df59a;
+}
+
+.replay-fx.spell {
+  color: #f7d06d;
+}
+
+.replay-fx.buff {
+  color: #87c8ff;
+}
+
 .replay-unit span {
   font-size: 12px;
   font-weight: 700;
@@ -502,6 +540,22 @@
 .hp-bar div {
   height: 100%;
   background: linear-gradient(90deg, #74d86d, #dff2a4);
+}
+
+@keyframes float-up {
+  from {
+    opacity: 0;
+    margin-top: 8px;
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+    margin-top: -18px;
+  }
 }
 
 .level-card,

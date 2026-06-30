@@ -39,6 +39,14 @@ interface ReplayEntityState {
   alive: boolean
 }
 
+interface ReplayFx {
+  id: string
+  x: number
+  y: number
+  label: string
+  tone: 'damage' | 'heal' | 'spell' | 'buff'
+}
+
 const initialBuildingLayout: Record<string, Pick<BuildingSaveState, 'row' | 'col'>> = {
   castle: { row: 3, col: 3 },
   house: { row: 0, col: 0 },
@@ -273,6 +281,26 @@ const getPlacementAtCell = (formation: FormationPlacement[], row: number, col: n
     return row >= item.row && row < item.row + template.footprint.height && col >= item.col && col < item.col + template.footprint.width
   })
 
+const canPlaceFormationUnit = (
+  formation: FormationPlacement[],
+  roster: SaveGame['roster'],
+  unitId: string,
+  row: number,
+  col: number,
+  movingPlacementIndex?: number,
+) => {
+  const nextPlacement: FormationPlacement = { unitId, row, col, level: 1 }
+  const remaining = formation.filter((_, index) => index !== movingPlacementIndex)
+  const placedCount = remaining.filter((placement) => placement.unitId === unitId).length
+  const ownedCount = roster[unitId] ?? 0
+
+  if (placedCount >= ownedCount && movingPlacementIndex === undefined) {
+    return false
+  }
+
+  return validateArmy({ placements: [...remaining, nextPlacement] }, 'A').ok
+}
+
 const canPlaceBuilding = (buildingId: string, row: number, col: number, buildings: SaveGame['buildings']) => {
   const template = buildingById[buildingId]
 
@@ -323,10 +351,13 @@ function App() {
   const [error, setError] = useState('')
   const [saveMessage, setSaveMessage] = useState('')
   const [dragState, setDragState] = useState<DragState | null>(null)
+  const [hoveredCityCell, setHoveredCityCell] = useState<{ row: number; col: number } | null>(null)
+  const [hoveredBattleCell, setHoveredBattleCell] = useState<{ row: number; col: number } | null>(null)
   const [replayEntities, setReplayEntities] = useState<ReplayEntityState[]>([])
   const [replayTick, setReplayTick] = useState(0)
   const [replayPlaying, setReplayPlaying] = useState(false)
   const [replayHighlights, setReplayHighlights] = useState<{ attackers: string[]; targets: string[] }>({ attackers: [], targets: [] })
+  const [replayEffects, setReplayEffects] = useState<ReplayFx[]>([])
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -376,6 +407,7 @@ function App() {
     setReplayTick(0)
     setReplayPlaying(true)
     setReplayHighlights({ attackers: [], targets: [] })
+    setReplayEffects([])
   }, [battleResult, replaySourcePlacements])
 
   useEffect(() => {
@@ -399,10 +431,35 @@ function App() {
       if (tickEvents.length > 0) {
         setReplayEntities((current) => {
           const next = current.map((entity) => ({ ...entity }))
+          const nextEffects: ReplayFx[] = []
 
           for (const event of tickEvents) {
             const source = next.find((entity) => entity.entityId === event.sourceId)
             const target = next.find((entity) => entity.entityId === event.targetId)
+
+            if (target && typeof event.value === 'number' && (event.type === 'attack' || event.type === 'heal' || event.type === 'spell' || event.type === 'buff')) {
+              nextEffects.push({
+                id: `${replayTick}-${event.type}-${event.targetId}-${event.value}`,
+                x: target.col * 48 + target.width * 24 - 18,
+                y: target.row * 48 + 8,
+                label:
+                  event.type === 'heal'
+                    ? `+${event.value}`
+                    : event.type === 'buff'
+                      ? `ATK+${event.value}`
+                      : event.type === 'spell' && event.note?.includes('治疗')
+                        ? `+${event.value}`
+                        : `-${event.value}`,
+                tone:
+                  event.type === 'heal'
+                    ? 'heal'
+                    : event.type === 'buff'
+                      ? 'buff'
+                      : event.type === 'spell'
+                        ? 'spell'
+                        : 'damage',
+              })
+            }
 
             if (event.type === 'move' && source) {
               source.col += source.side === 'A' ? 1 : -1
@@ -426,8 +483,12 @@ function App() {
             }
           }
 
+          setReplayEffects(nextEffects)
+
           return next
         })
+      } else {
+        setReplayEffects([])
       }
 
       setReplayTick((current) => current + 1)
@@ -635,13 +696,28 @@ function App() {
       return
     }
 
+    if (getPlacementAtCell(tutorialLevel.defender.placements, row, col)) {
+      setError('不能拖放到敌方占用区域。')
+      return
+    }
+
     if (dragState.type === 'roster-unit') {
+      if (!canPlaceFormationUnit(save.formation, save.roster, dragState.unitId, row, col)) {
+        setError('该位置无法部署此单位。')
+        return
+      }
+
       setSelectedUnitId(dragState.unitId)
       placeUnit(row, col, dragState.unitId)
       return
     }
 
     if (dragState.type === 'placed-unit') {
+      if (!canPlaceFormationUnit(save.formation, save.roster, dragState.unitId, row, col, dragState.placementIndex)) {
+        setError('该位置无法移动到。')
+        return
+      }
+
       moveExistingPlacement(dragState.placementIndex, row, col)
     }
   }
@@ -651,6 +727,7 @@ function App() {
     setReplayTick(0)
     setReplayPlaying(true)
     setReplayHighlights({ attackers: [], targets: [] })
+    setReplayEffects([])
   }
 
   const placeUnit = (row: number, col: number, unitId = selectedUnitId) => {
@@ -866,23 +943,33 @@ function App() {
           <div className="city-grid-frame">
             <div className="city-grid">
               {Array.from({ length: cityRows }).flatMap((_, row) =>
-                Array.from({ length: cityColumns }).map((__, col) => (
-                  <button
-                    key={`city-${row}-${col}`}
-                    type="button"
-                    className={`city-cell${dragState?.type === 'building' && canPlaceBuilding(dragState.buildingId, row, col, save.buildings) ? ' droppable' : ''}`}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={(event) => {
-                      event.preventDefault()
+                Array.from({ length: cityColumns }).map((__, col) => {
+                  const canDropHere = dragState?.type === 'building' && canPlaceBuilding(dragState.buildingId, row, col, save.buildings)
+                  const hovered = hoveredCityCell?.row === row && hoveredCityCell.col === col
 
-                      if (dragState?.type === 'building') {
-                        moveBuilding(dragState.buildingId, row, col)
-                      }
+                  return (
+                    <button
+                      key={`city-${row}-${col}`}
+                      type="button"
+                      className={`city-cell${hovered ? (canDropHere ? ' droppable' : dragState?.type === 'building' ? ' blocked' : '') : ''}`}
+                      onDragOver={(event) => {
+                        event.preventDefault()
+                        setHoveredCityCell({ row, col })
+                      }}
+                      onDragLeave={() => setHoveredCityCell((current) => (current?.row === row && current.col === col ? null : current))}
+                      onDrop={(event) => {
+                        event.preventDefault()
 
-                      setDragState(null)
-                    }}
-                  />
-                )),
+                        if (dragState?.type === 'building') {
+                          moveBuilding(dragState.buildingId, row, col)
+                        }
+
+                        setDragState(null)
+                        setHoveredCityCell(null)
+                      }}
+                    />
+                  )
+                }),
               )}
               {Object.entries(save.buildings).map(([buildingId, state]) => {
                 const building = buildingById[buildingId]
@@ -1017,13 +1104,20 @@ function App() {
                   const defender = getPlacementAtCell(tutorialLevel.defender.placements, row, col)
                   const isNeutral = col === 7
                   const isPlacementAnchor = placement ? placement.row === row && placement.col === col : false
+                  const canDropUnit =
+                    dragState?.type === 'roster-unit'
+                      ? canPlaceFormationUnit(save.formation, save.roster, dragState.unitId, row, col)
+                      : dragState?.type === 'placed-unit'
+                        ? canPlaceFormationUnit(save.formation, save.roster, dragState.unitId, row, col, dragState.placementIndex)
+                        : false
+                  const hovered = hoveredBattleCell?.row === row && hoveredBattleCell.col === col
 
                   return (
                     <button
                       key={`${row}-${col}`}
                       type="button"
                       draggable={isPlacementAnchor}
-                      className={`cell${placement ? ' attacker' : ''}${defender ? ' defender' : ''}${isNeutral ? ' neutral' : ''}`}
+                      className={`cell${placement ? ' attacker' : ''}${defender ? ' defender' : ''}${isNeutral ? ' neutral' : ''}${hovered ? (canDropUnit && col <= 6 && !defender ? ' drop-ok' : dragState ? ' drop-bad' : '') : ''}`}
                       onDragStart={() => {
                         if (placement && placementIndex >= 0) {
                           setDragState({ type: 'placed-unit', placementIndex, unitId: placement.unitId })
@@ -1033,12 +1127,15 @@ function App() {
                       onDragOver={(event) => {
                         if (col <= 6) {
                           event.preventDefault()
+                          setHoveredBattleCell({ row, col })
                         }
                       }}
+                      onDragLeave={() => setHoveredBattleCell((current) => (current?.row === row && current.col === col ? null : current))}
                       onDrop={(event) => {
                         event.preventDefault()
                         handleBattlefieldDrop(row, col)
                         setDragState(null)
+                        setHoveredBattleCell(null)
                       }}
                       onClick={() => {
                         if (placement) {
@@ -1195,6 +1292,11 @@ function App() {
                       <div className="hp-bar">
                         <div style={{ width: `${Math.max(0, (entity.hp / entity.maxHp) * 100)}%` }} />
                       </div>
+                    </div>
+                  ))}
+                  {replayEffects.map((effect) => (
+                    <div key={effect.id} className={`replay-fx ${effect.tone}`} style={{ transform: `translate(${effect.x}px, ${effect.y}px)` }}>
+                      {effect.label}
                     </div>
                   ))}
                 </div>
