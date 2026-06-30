@@ -559,6 +559,7 @@ function App() {
   const replaySourcePlacements = useMemo(() => buildReplayEntities(save.formation, tutorialLevel.defender.placements), [save.formation, tutorialLevel.defender.placements])
   const showBattleStage = battleResult !== null
   const battleAnimationFinished = battleResult ? replayTick > battleResult.endTick : false
+  const battleOutcomeLabel = battleResult ? (battleResult.winner === 'A' ? '胜利' : battleResult.winner === 'B' ? '失败' : '平局') : ''
   const buildingPreview = useMemo(
     () =>
       dragState?.type === 'building'
@@ -1261,6 +1262,25 @@ function App() {
             {showBattleStage ? (
               <div className="replay-field embedded-replay-field">
                 {battleIntroCountdown > 0 ? <div className="battle-intro">{battleIntroCountdown === 1 ? '开战' : battleIntroCountdown}</div> : null}
+                {battleAnimationFinished && battleResult ? (
+                  <div className={`battle-finish-overlay outcome-${battleResult.winner === 'A' ? 'win' : battleResult.winner === 'B' ? 'lose' : 'draw'}`}>
+                    <div className="battle-finish-card">
+                      <span className="battle-finish-label">战斗结束</span>
+                      <strong>{battleOutcomeLabel}</strong>
+                      <p>
+                        结束于 Tick {battleResult.endTick}，战损 {battleResult.summary.attackerLosses} / {battleResult.summary.defenderLosses}
+                      </p>
+                      <div className="battle-finish-actions">
+                        <button type="button" className="action-button" onClick={restartReplay}>
+                          重新播放
+                        </button>
+                        <button type="button" className="action-button" onClick={returnToFormation}>
+                          返回布阵
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="battlefield-grid replay-grid-base">
                   {Array.from({ length: gameContent.battlefield.rows * gameContent.battlefield.columns }).map((_, index) => {
                     const col = index % gameContent.battlefield.columns
@@ -1479,6 +1499,10 @@ function App() {
                   <strong>
                     {battleResult.winner === 'A' ? `${tutorialLevel.rewards.gold}G / ${tutorialLevel.rewards.crystal}C` : '0'}
                   </strong>
+                </div>
+                <div>
+                  <span>结算状态</span>
+                  <strong>{battleAnimationFinished ? '已结算' : '动画中'}</strong>
                 </div>
               </div>
               <div className="log-list">

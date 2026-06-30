@@ -477,6 +477,63 @@
   pointer-events: none;
 }
 
+.battle-finish-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  background: rgba(14, 10, 8, 0.58);
+}
+
+.battle-finish-card {
+  min-width: min(92%, 340px);
+  padding: 22px;
+  border-radius: 22px;
+  text-align: center;
+  border: 1px solid rgba(255, 216, 154, 0.18);
+  background: rgba(35, 23, 17, 0.92);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.battle-finish-label {
+  display: block;
+  color: #c8af8c;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.battle-finish-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 36px;
+}
+
+.battle-finish-card p {
+  margin: 10px 0 0;
+  color: #d2bea0;
+}
+
+.battle-finish-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.outcome-win .battle-finish-card strong {
+  color: #9df0a8;
+}
+
+.outcome-lose .battle-finish-card strong {
+  color: #ff9d8f;
+}
+
+.outcome-draw .battle-finish-card strong {
+  color: #f5d899;
+}
+
 .replay-grid-base {
   position: relative;
 }
