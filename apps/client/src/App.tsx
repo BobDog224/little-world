@@ -56,6 +56,13 @@ interface ReplayTrace {
   tone: 'projectile' | 'spell' | 'impact'
 }
 
+interface ReplayFrameState {
+  entities: ReplayEntityState[]
+  highlights: { attackers: string[]; targets: string[] }
+  effects: ReplayFx[]
+  traces: ReplayTrace[]
+}
+
 const initialBuildingLayout: Record<string, Pick<BuildingSaveState, 'row' | 'col'>> = {
   castle: { row: 3, col: 3 },
   house: { row: 0, col: 0 },
@@ -284,6 +291,102 @@ const buildReplayEntities = (formation: FormationPlacement[], defender: Formatio
   return entries
 }
 
+const buildReplayFrame = (baseEntities: ReplayEntityState[], battleResult: BattleResult, tick: number): ReplayFrameState => {
+  const entities = baseEntities.map((entity) => ({ ...entity }))
+  const currentTick = Math.max(0, Math.min(tick, battleResult.endTick))
+
+  for (const event of battleResult.events) {
+    if (event.tick > currentTick) {
+      break
+    }
+
+    const source = entities.find((entity) => entity.entityId === event.sourceId)
+    const target = entities.find((entity) => entity.entityId === event.targetId)
+
+    if (event.type === 'move' && source) {
+      source.col += source.side === 'A' ? 1 : -1
+    }
+
+    if ((event.type === 'attack' || event.type === 'spell') && target && typeof event.value === 'number') {
+      if (event.type === 'spell' && event.note?.includes('治疗')) {
+        target.hp = Math.min(target.maxHp, target.hp + event.value)
+      } else {
+        target.hp = Math.max(0, target.hp - event.value)
+      }
+    }
+
+    if (event.type === 'heal' && target && typeof event.value === 'number') {
+      target.hp = Math.min(target.maxHp, target.hp + event.value)
+    }
+
+    if (event.type === 'death' && target) {
+      target.hp = 0
+      target.alive = false
+    }
+  }
+
+  const tickEvents = battleResult.events.filter((event) => event.tick === currentTick)
+  const effects: ReplayFx[] = []
+  const traces: ReplayTrace[] = []
+
+  for (const event of tickEvents) {
+    const source = entities.find((entity) => entity.entityId === event.sourceId)
+    const target = entities.find((entity) => entity.entityId === event.targetId)
+
+    if (source && target && (event.type === 'attack' || event.type === 'spell')) {
+      const startX = source.col * 48 + source.width * 24
+      const startY = source.row * 48 + source.height * 24
+      const endX = target.col * 48 + target.width * 24
+      const endY = target.row * 48 + target.height * 24
+      const dx = endX - startX
+      const dy = endY - startY
+
+      traces.push({
+        id: `${currentTick}-${event.type}-trace-${source.entityId}-${target.entityId}`,
+        x: startX,
+        y: startY,
+        width: Math.hypot(dx, dy),
+        angle: (Math.atan2(dy, dx) * 180) / Math.PI,
+        tone: event.type === 'spell' ? 'spell' : source.col === target.col || source.row === target.row ? 'impact' : 'projectile',
+      })
+    }
+
+    if (target && typeof event.value === 'number' && (event.type === 'attack' || event.type === 'heal' || event.type === 'spell' || event.type === 'buff')) {
+      effects.push({
+        id: `${currentTick}-${event.type}-${event.targetId}-${event.value}`,
+        x: target.col * 48 + target.width * 24 - 18,
+        y: target.row * 48 + 8,
+        label:
+          event.type === 'heal'
+            ? `+${event.value}`
+            : event.type === 'buff'
+              ? `ATK+${event.value}`
+              : event.type === 'spell' && event.note?.includes('治疗')
+                ? `+${event.value}`
+                : `-${event.value}`,
+        tone:
+          event.type === 'heal'
+            ? 'heal'
+            : event.type === 'buff'
+              ? 'buff'
+              : event.type === 'spell'
+                ? 'spell'
+                : 'damage',
+      })
+    }
+  }
+
+  return {
+    entities,
+    highlights: {
+      attackers: tickEvents.map((event) => event.sourceId).filter(Boolean) as string[],
+      targets: tickEvents.map((event) => event.targetId).filter(Boolean) as string[],
+    },
+    effects,
+    traces,
+  }
+}
+
 const getPlacementAtCell = (formation: FormationPlacement[], row: number, col: number) =>
   formation.find((item) => {
     const template = unitById[item.unitId]
@@ -368,6 +471,7 @@ function App() {
   const [replayHighlights, setReplayHighlights] = useState<{ attackers: string[]; targets: string[] }>({ attackers: [], targets: [] })
   const [replayEffects, setReplayEffects] = useState<ReplayFx[]>([])
   const [replayTraces, setReplayTraces] = useState<ReplayTrace[]>([])
+  const [battleIntroCountdown, setBattleIntroCountdown] = useState(0)
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -417,14 +521,34 @@ function App() {
 
     setReplayEntities(replaySourcePlacements)
     setReplayTick(0)
-    setReplayPlaying(true)
+    setReplayPlaying(false)
     setReplayHighlights({ attackers: [], targets: [] })
     setReplayEffects([])
     setReplayTraces([])
+    setBattleIntroCountdown(3)
   }, [battleResult, replaySourcePlacements])
 
   useEffect(() => {
-    if (!battleResult || !replayPlaying) {
+    if (!battleResult || battleIntroCountdown <= 0) {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      setBattleIntroCountdown((current) => {
+        if (current <= 1) {
+          setReplayPlaying(true)
+          return 0
+        }
+
+        return current - 1
+      })
+    }, 700)
+
+    return () => window.clearTimeout(timer)
+  }, [battleResult, battleIntroCountdown])
+
+  useEffect(() => {
+    if (!battleResult || !replayPlaying || battleIntroCountdown > 0) {
       return
     }
 
@@ -433,103 +557,22 @@ function App() {
       return
     }
 
-    const timer = window.setTimeout(() => {
-      const tickEvents = battleResult.events.filter((event) => event.tick === replayTick)
-
-      setReplayHighlights({
-        attackers: tickEvents.map((event) => event.sourceId).filter(Boolean) as string[],
-        targets: tickEvents.map((event) => event.targetId).filter(Boolean) as string[],
-      })
-
-      if (tickEvents.length > 0) {
-        setReplayEntities((current) => {
-          const next = current.map((entity) => ({ ...entity }))
-          const nextEffects: ReplayFx[] = []
-          const nextTraces: ReplayTrace[] = []
-
-          for (const event of tickEvents) {
-            const source = next.find((entity) => entity.entityId === event.sourceId)
-            const target = next.find((entity) => entity.entityId === event.targetId)
-
-            if (source && target && (event.type === 'attack' || event.type === 'spell')) {
-              const startX = source.col * 48 + source.width * 24
-              const startY = source.row * 48 + source.height * 24
-              const endX = target.col * 48 + target.width * 24
-              const endY = target.row * 48 + target.height * 24
-              const dx = endX - startX
-              const dy = endY - startY
-
-              nextTraces.push({
-                id: `${replayTick}-${event.type}-trace-${source.entityId}-${target.entityId}`,
-                x: startX,
-                y: startY,
-                width: Math.hypot(dx, dy),
-                angle: (Math.atan2(dy, dx) * 180) / Math.PI,
-                tone: event.type === 'spell' ? 'spell' : source.col === target.col || source.row === target.row ? 'impact' : 'projectile',
-              })
-            }
-
-            if (target && typeof event.value === 'number' && (event.type === 'attack' || event.type === 'heal' || event.type === 'spell' || event.type === 'buff')) {
-              nextEffects.push({
-                id: `${replayTick}-${event.type}-${event.targetId}-${event.value}`,
-                x: target.col * 48 + target.width * 24 - 18,
-                y: target.row * 48 + 8,
-                label:
-                  event.type === 'heal'
-                    ? `+${event.value}`
-                    : event.type === 'buff'
-                      ? `ATK+${event.value}`
-                      : event.type === 'spell' && event.note?.includes('治疗')
-                        ? `+${event.value}`
-                        : `-${event.value}`,
-                tone:
-                  event.type === 'heal'
-                    ? 'heal'
-                    : event.type === 'buff'
-                      ? 'buff'
-                      : event.type === 'spell'
-                        ? 'spell'
-                        : 'damage',
-              })
-            }
-
-            if (event.type === 'move' && source) {
-              source.col += source.side === 'A' ? 1 : -1
-            }
-
-            if ((event.type === 'attack' || event.type === 'spell') && target && typeof event.value === 'number') {
-              if (event.type === 'spell' && event.note?.includes('治疗')) {
-                target.hp = Math.min(target.maxHp, target.hp + event.value)
-              } else {
-                target.hp = Math.max(0, target.hp - event.value)
-              }
-            }
-
-            if (event.type === 'heal' && target && typeof event.value === 'number') {
-              target.hp = Math.min(target.maxHp, target.hp + event.value)
-            }
-
-            if (event.type === 'death' && target) {
-              target.hp = 0
-              target.alive = false
-            }
-          }
-
-          setReplayEffects(nextEffects)
-          setReplayTraces(nextTraces)
-
-          return next
-        })
-      } else {
-        setReplayEffects([])
-        setReplayTraces([])
-      }
-
-      setReplayTick((current) => current + 1)
-    }, 140)
+    const timer = window.setTimeout(() => setReplayTick((current) => current + 1), 140)
 
     return () => window.clearTimeout(timer)
-  }, [battleResult, replayPlaying, replayTick])
+  }, [battleResult, replayPlaying, replayTick, battleIntroCountdown])
+
+  useEffect(() => {
+    if (!battleResult) {
+      return
+    }
+
+    const frame = buildReplayFrame(replaySourcePlacements, battleResult, replayTick)
+    setReplayEntities(frame.entities)
+    setReplayHighlights(frame.highlights)
+    setReplayEffects(frame.effects)
+    setReplayTraces(frame.traces)
+  }, [battleResult, replaySourcePlacements, replayTick])
 
   const exportSave = () => {
     const exportPayload = JSON.stringify(refreshDailyState(save), null, 2)
@@ -763,6 +806,7 @@ function App() {
     setReplayHighlights({ attackers: [], targets: [] })
     setReplayEffects([])
     setReplayTraces([])
+    setBattleIntroCountdown(0)
   }
 
   const returnToFormation = () => {
@@ -773,6 +817,7 @@ function App() {
     setReplayHighlights({ attackers: [], targets: [] })
     setReplayEffects([])
     setReplayTraces([])
+    setBattleIntroCountdown(0)
   }
 
   const placeUnit = (row: number, col: number, unitId = selectedUnitId) => {
@@ -1142,7 +1187,7 @@ function App() {
           {!showBattleStage && !attackerValidation.ok ? <p className="warning-text">当前阵型: {attackerValidation.reason}</p> : null}
           {showBattleStage ? (
             <div className="replay-toolbar inline-toolbar">
-              <button type="button" className="action-button" disabled={battleAnimationFinished} onClick={() => setReplayPlaying((current) => !current)}>
+              <button type="button" className="action-button" disabled={battleAnimationFinished || battleIntroCountdown > 0} onClick={() => setReplayPlaying((current) => !current)}>
                 {replayPlaying ? '暂停动画' : '继续动画'}
               </button>
               <button type="button" className="action-button" onClick={restartReplay}>
@@ -1157,6 +1202,7 @@ function App() {
           <div className="battlefield-frame">
             {showBattleStage ? (
               <div className="replay-field embedded-replay-field">
+                {battleIntroCountdown > 0 ? <div className="battle-intro">{battleIntroCountdown === 1 ? '开战' : battleIntroCountdown}</div> : null}
                 <div className="battlefield-grid replay-grid-base">
                   {Array.from({ length: gameContent.battlefield.rows * gameContent.battlefield.columns }).map((_, index) => {
                     const col = index % gameContent.battlefield.columns
@@ -1310,6 +1356,28 @@ function App() {
           <button type="button" className="battle-button" onClick={runBattle}>
             开始战斗
           </button>
+          {battleResult ? (
+            <div className="timeline-panel">
+              <div className="timeline-header">
+                <span>战斗进度</span>
+                <strong>
+                  {Math.min(replayTick, battleResult.endTick)} / {battleResult.endTick}
+                </strong>
+              </div>
+              <input
+                className="timeline-slider"
+                type="range"
+                min={0}
+                max={battleResult.endTick}
+                value={Math.min(replayTick, battleResult.endTick)}
+                onChange={(event) => {
+                  setBattleIntroCountdown(0)
+                  setReplayPlaying(false)
+                  setReplayTick(Number(event.target.value))
+                }}
+              />
+            </div>
+          ) : null}
         </article>
 
         <article className="panel">
