@@ -433,6 +433,30 @@ const canPlaceBuilding = (buildingId: string, row: number, col: number, building
   })
 }
 
+const getBuildingPreviewState = (
+  buildingId: string,
+  anchor: { row: number; col: number } | null,
+  buildings: SaveGame['buildings'],
+) => {
+  if (!anchor) {
+    return { cells: new Set<string>(), valid: false }
+  }
+
+  const template = buildingById[buildingId]
+  const cells = new Set<string>()
+
+  for (let rowOffset = 0; rowOffset < template.size.height; rowOffset += 1) {
+    for (let colOffset = 0; colOffset < template.size.width; colOffset += 1) {
+      cells.add(`${anchor.row + rowOffset}:${anchor.col + colOffset}`)
+    }
+  }
+
+  return {
+    cells,
+    valid: canPlaceBuilding(buildingId, anchor.row, anchor.col, buildings),
+  }
+}
+
 const getPopulationCap = () => {
   const castleBonus = buildingById.castle.economy?.populationBonus ?? 0
   const houseBonus = buildingById.house.economy?.populationBonus ?? 0
@@ -513,6 +537,13 @@ function App() {
   const replaySourcePlacements = useMemo(() => buildReplayEntities(save.formation, tutorialLevel.defender.placements), [save.formation, tutorialLevel.defender.placements])
   const showBattleStage = battleResult !== null
   const battleAnimationFinished = battleResult ? replayTick > battleResult.endTick : false
+  const buildingPreview = useMemo(
+    () =>
+      dragState?.type === 'building'
+        ? getBuildingPreviewState(dragState.buildingId, hoveredCityCell, save.buildings)
+        : { cells: new Set<string>(), valid: false },
+    [dragState, hoveredCityCell, save.buildings],
+  )
 
   useEffect(() => {
     if (!battleResult) {
@@ -1034,14 +1065,15 @@ function App() {
             <div className="city-grid">
               {Array.from({ length: cityRows }).flatMap((_, row) =>
                 Array.from({ length: cityColumns }).map((__, col) => {
-                  const canDropHere = dragState?.type === 'building' && canPlaceBuilding(dragState.buildingId, row, col, save.buildings)
+                  const inPreview = buildingPreview.cells.has(`${row}:${col}`)
                   const hovered = hoveredCityCell?.row === row && hoveredCityCell.col === col
+                  const previewClass = inPreview ? (buildingPreview.valid ? ' droppable' : ' blocked') : ''
 
                   return (
                     <button
                       key={`city-${row}-${col}`}
                       type="button"
-                      className={`city-cell${hovered ? (canDropHere ? ' droppable' : dragState?.type === 'building' ? ' blocked' : '') : ''}`}
+                      className={`city-cell${previewClass}${hovered && !inPreview && dragState?.type === 'building' ? ' preview-anchor' : ''}`}
                       onDragOver={(event) => {
                         event.preventDefault()
                         setHoveredCityCell({ row, col })

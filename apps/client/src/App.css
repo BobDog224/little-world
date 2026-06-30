@@ -375,6 +375,10 @@
   border-color: rgba(216, 109, 109, 0.5);
 }
 
+.city-cell.preview-anchor {
+  box-shadow: inset 0 0 0 2px rgba(255, 226, 164, 0.65);
+}
+
 .city-building {
   z-index: 1;
   padding: 8px;
