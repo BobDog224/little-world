@@ -49,6 +49,12 @@ export interface BuildingTemplate {
   name: string
   category: string
   size: Footprint
+  upgrade?: {
+    maxLevel: number
+    baseGold: number
+    baseCrystal: number
+    baseDurationMinutes: number
+  }
   economy?: {
     resourceId?: ResourceId
     ratePerHour?: number
@@ -144,6 +150,9 @@ export interface BuildingSaveState {
   lastCollectedAt: string
   row: number
   col: number
+  level: number
+  upgradingToLevel?: number
+  upgradeCompleteAt?: string
 }
 
 export interface SaveGame {

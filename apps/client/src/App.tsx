@@ -14,11 +14,12 @@ import type {
 
 const saveKey = 'little-empire-save-v1'
 const saveSchemaVersion = 2
-const contentVersion = 'mvp-0.4.0'
+const contentVersion = 'mvp-0.5.0'
 const maxImportSizeBytes = 256 * 1024
 const todayKey = () => new Date().toISOString().slice(0, 10)
 const cityRows = 16
 const cityColumns = 16
+const nowIso = () => new Date().toISOString()
 
 type DragState =
   | { type: 'building'; buildingId: string }
@@ -83,6 +84,45 @@ const initialBuildingLayout: Record<string, Pick<BuildingSaveState, 'row' | 'col
   warehouse: { row: 11, col: 10 },
 }
 
+const getBuildingLevelValue = (base: number | undefined, level: number, scale = 1) => (base ? Math.round(base * (1 + (level - 1) * scale)) : 0)
+
+const getBuildingUpgradeCost = (buildingId: string, level: number) => {
+  const upgrade = buildingById[buildingId].upgrade
+
+  if (!upgrade) {
+    return null
+  }
+
+  return {
+    gold: Math.round(upgrade.baseGold * (1 + (level - 1) * 0.8)),
+    crystal: Math.round(upgrade.baseCrystal * (1 + (level - 1) * 0.75)),
+    durationMinutes: Math.round(upgrade.baseDurationMinutes * (1 + (level - 1) * 0.6)),
+  }
+}
+
+const resolveBuildingState = (buildingId: string, state: BuildingSaveState): BuildingSaveState => {
+  if (!state.upgradeCompleteAt || !state.upgradingToLevel) {
+    return state
+  }
+
+  if (new Date(state.upgradeCompleteAt).getTime() > Date.now()) {
+    return state
+  }
+
+  const building = buildingById[buildingId]
+
+  return {
+    ...state,
+    level: state.upgradingToLevel,
+    upgradingToLevel: undefined,
+    upgradeCompleteAt: undefined,
+    lastCollectedAt: building.economy?.resourceId ? state.upgradeCompleteAt : state.lastCollectedAt,
+  }
+}
+
+const resolveBuildings = (buildings: SaveGame['buildings']) =>
+  Object.fromEntries(Object.entries(buildings).map(([buildingId, state]) => [buildingId, resolveBuildingState(buildingId, state)])) as SaveGame['buildings']
+
 const createInitialSave = (): SaveGame => ({
   schemaVersion: saveSchemaVersion,
   contentVersion,
@@ -91,13 +131,13 @@ const createInitialSave = (): SaveGame => ({
     crystal: 700,
   },
   buildings: {
-    castle: { lastCollectedAt: new Date().toISOString(), ...initialBuildingLayout.castle },
-    house: { lastCollectedAt: new Date().toISOString(), ...initialBuildingLayout.house },
-    gold_mine: { lastCollectedAt: new Date(Date.now() - 1000 * 60 * 70).toISOString(), ...initialBuildingLayout.gold_mine },
-    crystal_mine: { lastCollectedAt: new Date(Date.now() - 1000 * 60 * 90).toISOString(), ...initialBuildingLayout.crystal_mine },
-    barracks: { lastCollectedAt: new Date().toISOString(), ...initialBuildingLayout.barracks },
-    shooting_range: { lastCollectedAt: new Date().toISOString(), ...initialBuildingLayout.shooting_range },
-    warehouse: { lastCollectedAt: new Date().toISOString(), ...initialBuildingLayout.warehouse },
+    castle: { lastCollectedAt: nowIso(), level: 1, ...initialBuildingLayout.castle },
+    house: { lastCollectedAt: nowIso(), level: 1, ...initialBuildingLayout.house },
+    gold_mine: { lastCollectedAt: new Date(Date.now() - 1000 * 60 * 70).toISOString(), level: 1, ...initialBuildingLayout.gold_mine },
+    crystal_mine: { lastCollectedAt: new Date(Date.now() - 1000 * 60 * 90).toISOString(), level: 1, ...initialBuildingLayout.crystal_mine },
+    barracks: { lastCollectedAt: nowIso(), level: 1, ...initialBuildingLayout.barracks },
+    shooting_range: { lastCollectedAt: nowIso(), level: 1, ...initialBuildingLayout.shooting_range },
+    warehouse: { lastCollectedAt: nowIso(), level: 1, ...initialBuildingLayout.warehouse },
   },
   roster: {
     behemoth: 1,
@@ -221,7 +261,12 @@ const parseImportedSave = (raw: string): SaveGame => {
     throw new Error('导入失败：存档不是有效对象。')
   }
 
-  return refreshDailyState(normalizeSave(parsed as Partial<SaveGame>))
+  const normalized = normalizeSave(parsed as Partial<SaveGame>)
+
+  return refreshDailyState({
+    ...normalized,
+    buildings: resolveBuildings(normalized.buildings),
+  })
 }
 
 const refreshDailyState = (save: SaveGame): SaveGame => {
@@ -246,7 +291,8 @@ const getStoredSave = (): SaveGame => {
   }
 
   try {
-    return refreshDailyState(normalizeSave(JSON.parse(raw) as Partial<SaveGame>))
+    const normalized = normalizeSave(JSON.parse(raw) as Partial<SaveGame>)
+    return refreshDailyState({ ...normalized, buildings: resolveBuildings(normalized.buildings) })
   } catch {
     return refreshDailyState(initialSave)
   }
@@ -478,9 +524,9 @@ const getBuildingPreviewState = (
   }
 }
 
-const getPopulationCap = () => {
-  const castleBonus = buildingById.castle.economy?.populationBonus ?? 0
-  const houseBonus = buildingById.house.economy?.populationBonus ?? 0
+const getPopulationCap = (save: SaveGame) => {
+  const castleBonus = getBuildingLevelValue(buildingById.castle.economy?.populationBonus, save.buildings.castle.level, 1)
+  const houseBonus = getBuildingLevelValue(buildingById.house.economy?.populationBonus, save.buildings.house.level, 1)
 
   return castleBonus + houseBonus
 }
@@ -488,18 +534,22 @@ const getPopulationCap = () => {
 const collectableAmount = (buildingId: string, save: SaveGame) => {
   const building = buildingById[buildingId]
   const economy = building.economy
+  const state = save.buildings[buildingId]
 
-  if (!economy?.resourceId || !economy.ratePerHour || !economy.capacity) {
+  if (!economy?.resourceId || !economy.ratePerHour || !economy.capacity || state.upgradeCompleteAt) {
     return 0
   }
 
-  const lastCollected = new Date(save.buildings[buildingId].lastCollectedAt).getTime()
+  const ratePerHour = getBuildingLevelValue(economy.ratePerHour, state.level, 0.8)
+  const capacity = getBuildingLevelValue(economy.capacity, state.level, 0.6)
+  const lastCollected = new Date(state.lastCollectedAt).getTime()
   const elapsedSeconds = Math.max(0, Math.floor((Date.now() - lastCollected) / 1000))
 
-  return Math.min(economy.capacity, Math.floor((economy.ratePerHour * elapsedSeconds) / 3600))
+  return Math.min(capacity, Math.floor((ratePerHour * elapsedSeconds) / 3600))
 }
 
 const getCardClassName = (selected: boolean) => `card${selected ? ' selected' : ''}`
+const formatSeconds = (seconds: number) => `${Math.floor(seconds / 60)}m ${seconds % 60}s`
 
 function App() {
   const [save, setSave] = useState<SaveGame>(() => getStoredSave())
@@ -523,6 +573,19 @@ function App() {
   useEffect(() => {
     localStorage.setItem(saveKey, JSON.stringify(save))
   }, [save])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSave((current) => {
+        const resolvedBuildings = resolveBuildings(current.buildings)
+        const changed = Object.keys(resolvedBuildings).some((buildingId) => resolvedBuildings[buildingId] !== current.buildings[buildingId])
+
+        return changed ? { ...current, buildings: resolvedBuildings } : current
+      })
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [])
 
   const tutorialLevel = useMemo(
     () => gameContent.tutorialLevels.find((level) => level.id === save.activeLevelId) ?? gameContent.tutorialLevels[0],
@@ -552,7 +615,7 @@ function App() {
   const attackerArmy = useMemo(() => ({ placements: save.formation }), [save.formation])
   const placementCounts = useMemo(() => countPlacedUnits(save.formation), [save.formation])
   const usedPopulation = useMemo(() => getArmyPopulation(attackerArmy), [attackerArmy])
-  const populationCap = getPopulationCap()
+  const populationCap = getPopulationCap(save)
   const attackerValidation = validateArmy(attackerArmy, 'A')
   const nextLevelXp = xpToNextLevel(save.playerLevel)
   const claimableTaskCount = tasks.filter((task) => task.canClaim).length
@@ -566,6 +629,25 @@ function App() {
         ? getBuildingPreviewState(dragState.buildingId, hoveredCityCell, save.buildings)
         : { cells: new Set<string>(), valid: false },
     [dragState, hoveredCityCell, save.buildings],
+  )
+  const cityBuildings = useMemo(
+    () =>
+      Object.entries(save.buildings).map(([buildingId, state]) => {
+        const template = buildingById[buildingId]
+        const cost = getBuildingUpgradeCost(buildingId, state.level)
+        const remainingSeconds = state.upgradeCompleteAt ? Math.max(0, Math.ceil((new Date(state.upgradeCompleteAt).getTime() - Date.now()) / 1000)) : 0
+
+        return {
+          id: buildingId,
+          template,
+          state,
+          cost,
+          remainingSeconds,
+          isUpgrading: Boolean(state.upgradeCompleteAt),
+          canUpgrade: Boolean(cost) && !state.upgradeCompleteAt && state.level < (template.upgrade?.maxLevel ?? 1),
+        }
+      }),
+    [save.buildings],
   )
 
   useEffect(() => {
@@ -776,6 +858,11 @@ function App() {
   }
 
   const moveBuilding = (buildingId: string, row: number, col: number) => {
+    if (save.buildings[buildingId].upgradeCompleteAt) {
+      setError('升级中的建筑不能移动。')
+      return
+    }
+
     if (!canPlaceBuilding(buildingId, row, col, save.buildings)) {
       setError('建筑不能放在这里：越界或与其他建筑重叠。')
       return
@@ -790,6 +877,50 @@ function App() {
           ...current.buildings[buildingId],
           row,
           col,
+        },
+      },
+    }))
+  }
+
+  const upgradeBuilding = (buildingId: string) => {
+    const state = save.buildings[buildingId]
+    const template = buildingById[buildingId]
+    const cost = getBuildingUpgradeCost(buildingId, state.level)
+
+    if (!template.upgrade || !cost) {
+      return
+    }
+
+    if (state.upgradeCompleteAt) {
+      setError('该建筑已在升级中。')
+      return
+    }
+
+    if (state.level >= template.upgrade.maxLevel) {
+      setError('该建筑已满级。')
+      return
+    }
+
+    if (save.wallets.gold < cost.gold || save.wallets.crystal < cost.crystal) {
+      setError('建筑升级所需金币或水晶不足。')
+      return
+    }
+
+    const upgradeCompleteAt = new Date(Date.now() + cost.durationMinutes * 60 * 1000).toISOString()
+
+    setError('')
+    setSave((current) => ({
+      ...current,
+      wallets: {
+        gold: current.wallets.gold - cost.gold,
+        crystal: current.wallets.crystal - cost.crystal,
+      },
+      buildings: {
+        ...current.buildings,
+        [buildingId]: {
+          ...current.buildings[buildingId],
+          upgradingToLevel: current.buildings[buildingId].level + 1,
+          upgradeCompleteAt,
         },
       },
     }))
@@ -1069,7 +1200,7 @@ function App() {
         <article className="panel wide-panel">
           <div className="panel-header">
             <h2>城市建造网格</h2>
-            <p>从下方建筑卡片拖到城市网格，可直接重排建筑布局。</p>
+            <p>从下方建筑卡片拖到城市网格，可直接重排建筑布局；已接入等级与升级状态。</p>
           </div>
           <div className="building-palette">
             {gameContent.buildings.map((building) => (
@@ -1143,6 +1274,30 @@ function App() {
               })}
             </div>
           </div>
+          <div className="city-management-grid">
+            {cityBuildings.map(({ id, template, state, cost, remainingSeconds, isUpgrading, canUpgrade }) => (
+              <div key={id} className="card city-management-card">
+                <div className="task-header-row">
+                  <strong>{template.name}</strong>
+                  <span>Lv.{state.level}</span>
+                </div>
+                <p className="task-copy">
+                  {isUpgrading
+                    ? `升级中，${formatSeconds(remainingSeconds)} 后升到 Lv.${state.upgradingToLevel}`
+                    : template.economy?.resourceId
+                      ? `当前产能 ${collectableAmount(id, save)} / ${template.economy.resourceId === 'gold' ? '金币' : '水晶'}`
+                      : '可在城市中移动，并支持升级成长。'}
+                </p>
+                {cost ? (
+                  <button type="button" className="action-button" disabled={!canUpgrade} onClick={() => upgradeBuilding(id)}>
+                    {canUpgrade ? `升级 ${cost.gold}G / ${cost.crystal}C / ${cost.durationMinutes}m` : isUpgrading ? '升级中' : '已满级'}
+                  </button>
+                ) : (
+                  <div className="hero-tag">不可升级</div>
+                )}
+              </div>
+            ))}
+          </div>
         </article>
 
         <article className="panel">
@@ -1157,10 +1312,11 @@ function App() {
               const resourceId = building.economy?.resourceId as ResourceId
 
               return (
-                <button key={buildingId} className="resource-card" type="button" onClick={() => collect(buildingId, resourceId)}>
+                <button key={buildingId} className="resource-card" type="button" onClick={() => collect(buildingId, resourceId)} disabled={Boolean(save.buildings[buildingId].upgradeCompleteAt)}>
                   <span>{building.name}</span>
+                  <small>Lv.{save.buildings[buildingId].level}</small>
                   <strong>{amount}</strong>
-                  <small>点击收取 {resourceId === 'gold' ? '金币' : '水晶'}</small>
+                  <small>{save.buildings[buildingId].upgradeCompleteAt ? '升级中暂停产出' : `点击收取 ${resourceId === 'gold' ? '金币' : '水晶'}`}</small>
                 </button>
               )
             })}

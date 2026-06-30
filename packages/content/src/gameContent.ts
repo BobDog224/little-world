@@ -280,6 +280,7 @@ const buildings: BuildingTemplate[] = [
     name: '城堡',
     category: 'default',
     size: { width: 9, height: 9 },
+    upgrade: { maxLevel: 5, baseGold: 900, baseCrystal: 240, baseDurationMinutes: 4 },
     economy: { populationBonus: 10 },
   },
   {
@@ -287,6 +288,7 @@ const buildings: BuildingTemplate[] = [
     name: '住宅',
     category: 'economy',
     size: { width: 3, height: 3 },
+    upgrade: { maxLevel: 5, baseGold: 500, baseCrystal: 200, baseDurationMinutes: 3 },
     economy: { populationBonus: 10 },
   },
   {
@@ -294,6 +296,7 @@ const buildings: BuildingTemplate[] = [
     name: '金矿',
     category: 'economy',
     size: { width: 5, height: 5 },
+    upgrade: { maxLevel: 5, baseGold: 700, baseCrystal: 260, baseDurationMinutes: 3 },
     economy: { resourceId: 'gold', ratePerHour: 330, capacity: 1500 },
   },
   {
@@ -301,6 +304,7 @@ const buildings: BuildingTemplate[] = [
     name: '水晶矿',
     category: 'economy',
     size: { width: 5, height: 5 },
+    upgrade: { maxLevel: 5, baseGold: 760, baseCrystal: 280, baseDurationMinutes: 3 },
     economy: { resourceId: 'crystal', ratePerHour: 66, capacity: 400 },
   },
   {
@@ -308,18 +312,21 @@ const buildings: BuildingTemplate[] = [
     name: '仓库',
     category: 'economy',
     size: { width: 5, height: 5 },
+    upgrade: { maxLevel: 5, baseGold: 640, baseCrystal: 220, baseDurationMinutes: 2 },
   },
   {
     id: 'barracks',
     name: '兵营',
     category: 'military',
     size: { width: 5, height: 5 },
+    upgrade: { maxLevel: 5, baseGold: 800, baseCrystal: 260, baseDurationMinutes: 3 },
   },
   {
     id: 'shooting_range',
     name: '射击场',
     category: 'military',
     size: { width: 5, height: 5 },
+    upgrade: { maxLevel: 5, baseGold: 900, baseCrystal: 320, baseDurationMinutes: 3 },
   },
 ]
 
