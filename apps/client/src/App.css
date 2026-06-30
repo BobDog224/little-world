@@ -437,6 +437,10 @@
   margin-top: 16px;
 }
 
+.inline-toolbar {
+  margin-bottom: 14px;
+}
+
 .replay-tick {
   padding: 10px 14px;
   border-radius: 14px;
@@ -448,6 +452,10 @@
   position: relative;
   margin-top: 16px;
   overflow-x: auto;
+}
+
+.embedded-replay-field {
+  margin-top: 0;
 }
 
 .replay-grid-base {

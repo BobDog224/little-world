@@ -397,6 +397,8 @@ function App() {
   const nextLevelXp = xpToNextLevel(save.playerLevel)
   const claimableTaskCount = tasks.filter((task) => task.canClaim).length
   const replaySourcePlacements = useMemo(() => buildReplayEntities(save.formation, tutorialLevel.defender.placements), [save.formation, tutorialLevel.defender.placements])
+  const showBattleStage = battleResult !== null
+  const battleAnimationFinished = battleResult ? replayTick > battleResult.endTick : false
 
   useEffect(() => {
     if (!battleResult) {
@@ -726,6 +728,15 @@ function App() {
     setReplayEntities(replaySourcePlacements)
     setReplayTick(0)
     setReplayPlaying(true)
+    setReplayHighlights({ attackers: [], targets: [] })
+    setReplayEffects([])
+  }
+
+  const returnToFormation = () => {
+    setBattleResult(null)
+    setReplayEntities([])
+    setReplayTick(0)
+    setReplayPlaying(false)
     setReplayHighlights({ attackers: [], targets: [] })
     setReplayEffects([])
   }
@@ -1092,68 +1103,120 @@ function App() {
         <article className="panel wide-panel">
           <div className="panel-header">
             <h2>6x15 阵型编辑</h2>
-            <p>左侧 0-6 列为我方部署区。可从库存拖拽上阵，也可拖动已部署单位调整位置。</p>
+            <p>{showBattleStage ? '战斗开始后，这里会直接播放双方推进和交战动画。' : '左侧 0-6 列为我方部署区。可从库存拖拽上阵，也可拖动已部署单位调整位置。'}</p>
           </div>
-          {!attackerValidation.ok ? <p className="warning-text">当前阵型: {attackerValidation.reason}</p> : null}
+          {!showBattleStage && !attackerValidation.ok ? <p className="warning-text">当前阵型: {attackerValidation.reason}</p> : null}
+          {showBattleStage ? (
+            <div className="replay-toolbar inline-toolbar">
+              <button type="button" className="action-button" disabled={battleAnimationFinished} onClick={() => setReplayPlaying((current) => !current)}>
+                {replayPlaying ? '暂停动画' : '继续动画'}
+              </button>
+              <button type="button" className="action-button" onClick={restartReplay}>
+                重新播放
+              </button>
+              <button type="button" className="action-button" onClick={returnToFormation}>
+                返回布阵
+              </button>
+              <div className="replay-tick">Tick {battleResult ? Math.min(replayTick, battleResult.endTick) : 0}</div>
+            </div>
+          ) : null}
           <div className="battlefield-frame">
-            <div className="battlefield-grid">
-              {Array.from({ length: gameContent.battlefield.rows }).flatMap((_, row) =>
-                Array.from({ length: gameContent.battlefield.columns }).map((__, col) => {
-                  const placement = getPlacementAtCell(save.formation, row, col)
-                  const placementIndex = placement ? save.formation.findIndex((item) => item === placement) : -1
-                  const defender = getPlacementAtCell(tutorialLevel.defender.placements, row, col)
-                  const isNeutral = col === 7
-                  const isPlacementAnchor = placement ? placement.row === row && placement.col === col : false
-                  const canDropUnit =
-                    dragState?.type === 'roster-unit'
-                      ? canPlaceFormationUnit(save.formation, save.roster, dragState.unitId, row, col)
-                      : dragState?.type === 'placed-unit'
-                        ? canPlaceFormationUnit(save.formation, save.roster, dragState.unitId, row, col, dragState.placementIndex)
-                        : false
-                  const hovered = hoveredBattleCell?.row === row && hoveredBattleCell.col === col
+            {showBattleStage ? (
+              <div className="replay-field embedded-replay-field">
+                <div className="battlefield-grid replay-grid-base">
+                  {Array.from({ length: gameContent.battlefield.rows * gameContent.battlefield.columns }).map((_, index) => {
+                    const col = index % gameContent.battlefield.columns
 
-                  return (
-                    <button
-                      key={`${row}-${col}`}
-                      type="button"
-                      draggable={isPlacementAnchor}
-                      className={`cell${placement ? ' attacker' : ''}${defender ? ' defender' : ''}${isNeutral ? ' neutral' : ''}${hovered ? (canDropUnit && col <= 6 && !defender ? ' drop-ok' : dragState ? ' drop-bad' : '') : ''}`}
-                      onDragStart={() => {
-                        if (placement && placementIndex >= 0) {
-                          setDragState({ type: 'placed-unit', placementIndex, unitId: placement.unitId })
-                        }
-                      }}
-                      onDragEnd={() => setDragState(null)}
-                      onDragOver={(event) => {
-                        if (col <= 6) {
-                          event.preventDefault()
-                          setHoveredBattleCell({ row, col })
-                        }
-                      }}
-                      onDragLeave={() => setHoveredBattleCell((current) => (current?.row === row && current.col === col ? null : current))}
-                      onDrop={(event) => {
-                        event.preventDefault()
-                        handleBattlefieldDrop(row, col)
-                        setDragState(null)
-                        setHoveredBattleCell(null)
-                      }}
-                      onClick={() => {
-                        if (placement) {
-                          removePlacement(row, col)
-                          return
-                        }
-
-                        if (!defender && col <= 6) {
-                          placeUnit(row, col)
-                        }
+                    return <div key={`inline-replay-${index}`} className={`cell replay-cell${col === 7 ? ' neutral' : ''}`} />
+                  })}
+                </div>
+                <div className="replay-overlay">
+                  {replayEntities.map((entity) => (
+                    <div
+                      key={entity.entityId}
+                      className={`replay-unit side-${entity.side.toLowerCase()}${entity.alive ? '' : ' dead'}${replayHighlights.attackers.includes(entity.entityId) ? ' acting' : ''}${replayHighlights.targets.includes(entity.entityId) ? ' impacted' : ''}`}
+                      style={{
+                        width: `${entity.width * 48 - 4}px`,
+                        height: `${entity.height * 48 - 4}px`,
+                        transform: `translate(${entity.col * 48}px, ${entity.row * 48}px)`,
                       }}
                     >
-                      <span>{placement ? unitById[placement.unitId].name[0] : defender ? unitById[defender.unitId].name[0] : ''}</span>
-                    </button>
-                  )
-                }),
-              )}
-            </div>
+                      <span>{entity.name}</span>
+                      <small>
+                        {Math.max(0, entity.hp)}/{entity.maxHp}
+                      </small>
+                      <div className="hp-bar">
+                        <div style={{ width: `${Math.max(0, (entity.hp / entity.maxHp) * 100)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                  {replayEffects.map((effect) => (
+                    <div key={effect.id} className={`replay-fx ${effect.tone}`} style={{ transform: `translate(${effect.x}px, ${effect.y}px)` }}>
+                      {effect.label}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="battlefield-grid">
+                {Array.from({ length: gameContent.battlefield.rows }).flatMap((_, row) =>
+                  Array.from({ length: gameContent.battlefield.columns }).map((__, col) => {
+                    const placement = getPlacementAtCell(save.formation, row, col)
+                    const placementIndex = placement ? save.formation.findIndex((item) => item === placement) : -1
+                    const defender = getPlacementAtCell(tutorialLevel.defender.placements, row, col)
+                    const isNeutral = col === 7
+                    const isPlacementAnchor = placement ? placement.row === row && placement.col === col : false
+                    const canDropUnit =
+                      dragState?.type === 'roster-unit'
+                        ? canPlaceFormationUnit(save.formation, save.roster, dragState.unitId, row, col)
+                        : dragState?.type === 'placed-unit'
+                          ? canPlaceFormationUnit(save.formation, save.roster, dragState.unitId, row, col, dragState.placementIndex)
+                          : false
+                    const hovered = hoveredBattleCell?.row === row && hoveredBattleCell.col === col
+
+                    return (
+                      <button
+                        key={`${row}-${col}`}
+                        type="button"
+                        draggable={isPlacementAnchor}
+                        className={`cell${placement ? ' attacker' : ''}${defender ? ' defender' : ''}${isNeutral ? ' neutral' : ''}${hovered ? (canDropUnit && col <= 6 && !defender ? ' drop-ok' : dragState ? ' drop-bad' : '') : ''}`}
+                        onDragStart={() => {
+                          if (placement && placementIndex >= 0) {
+                            setDragState({ type: 'placed-unit', placementIndex, unitId: placement.unitId })
+                          }
+                        }}
+                        onDragEnd={() => setDragState(null)}
+                        onDragOver={(event) => {
+                          if (col <= 6) {
+                            event.preventDefault()
+                            setHoveredBattleCell({ row, col })
+                          }
+                        }}
+                        onDragLeave={() => setHoveredBattleCell((current) => (current?.row === row && current.col === col ? null : current))}
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          handleBattlefieldDrop(row, col)
+                          setDragState(null)
+                          setHoveredBattleCell(null)
+                        }}
+                        onClick={() => {
+                          if (placement) {
+                            removePlacement(row, col)
+                            return
+                          }
+
+                          if (!defender && col <= 6) {
+                            placeUnit(row, col)
+                          }
+                        }}
+                      >
+                        <span>{placement ? unitById[placement.unitId].name[0] : defender ? unitById[defender.unitId].name[0] : ''}</span>
+                      </button>
+                    )
+                  }),
+                )}
+              </div>
+            )}
           </div>
         </article>
 
@@ -1250,62 +1313,6 @@ function App() {
           )}
         </article>
 
-        <article className="panel wide-panel">
-          <div className="panel-header">
-            <h2>战斗回放</h2>
-            <p>按事件重放推进、攻击、治疗与死亡，便于观察阵型和特效触发。</p>
-          </div>
-          {battleResult ? (
-            <>
-              <div className="replay-toolbar">
-                <button type="button" className="action-button" onClick={() => setReplayPlaying((current) => !current)}>
-                  {replayPlaying ? '暂停' : '继续'}
-                </button>
-                <button type="button" className="action-button" onClick={restartReplay}>
-                  重新播放
-                </button>
-                <div className="replay-tick">Tick {Math.min(replayTick, battleResult.endTick)}</div>
-              </div>
-              <div className="replay-field">
-                <div className="battlefield-grid replay-grid-base">
-                  {Array.from({ length: gameContent.battlefield.rows * gameContent.battlefield.columns }).map((_, index) => {
-                    const col = index % gameContent.battlefield.columns
-
-                    return <div key={`replay-${index}`} className={`cell replay-cell${col === 7 ? ' neutral' : ''}`} />
-                  })}
-                </div>
-                <div className="replay-overlay">
-                  {replayEntities.map((entity) => (
-                    <div
-                      key={entity.entityId}
-                      className={`replay-unit side-${entity.side.toLowerCase()}${entity.alive ? '' : ' dead'}${replayHighlights.attackers.includes(entity.entityId) ? ' acting' : ''}${replayHighlights.targets.includes(entity.entityId) ? ' impacted' : ''}`}
-                      style={{
-                        width: `${entity.width * 48 - 4}px`,
-                        height: `${entity.height * 48 - 4}px`,
-                        transform: `translate(${entity.col * 48}px, ${entity.row * 48}px)`,
-                      }}
-                    >
-                      <span>{entity.name}</span>
-                      <small>
-                        {Math.max(0, entity.hp)}/{entity.maxHp}
-                      </small>
-                      <div className="hp-bar">
-                        <div style={{ width: `${Math.max(0, (entity.hp / entity.maxHp) * 100)}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                  {replayEffects.map((effect) => (
-                    <div key={effect.id} className={`replay-fx ${effect.tone}`} style={{ transform: `translate(${effect.x}px, ${effect.y}px)` }}>
-                      {effect.label}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : (
-            <p className="empty-state">开始一场战斗后，这里会自动播放部队推进和交战动画。</p>
-          )}
-        </article>
       </section>
     </main>
   )
